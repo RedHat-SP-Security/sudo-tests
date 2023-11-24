@@ -2,3 +2,4 @@ component:
   - sudo
 require:
   - sudo
+framework: beakerlib
