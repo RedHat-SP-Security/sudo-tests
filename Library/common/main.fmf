@@ -1,0 +1,9 @@
+description: a commom sudo testing library covering the basic setup and cleanup
+    of the environment and sudoers file settings as well as a wrapper over
+    the sudo/ldap library so the configuration is the same for files, ldap, and sss
+contact:
+  - Dalibor Pospisil <dapospis@redhat.com>
+require:
+  - sudo
+provide:
+  - library(sudo/common)
