@@ -8,3 +8,21 @@ require+:
   - url: https://github.com/RedHat-SP-Security/rsyslog-tests.git
     name: /Library/basic
     type: library
+link:
+  - verifies: https://issues.redhat.com/browse/RHEL-1505
+  - verifies: https://issues.redhat.com/browse/RHEL-9717
+  - verifies: https://issues.redhat.com/browse/RHEL-21827
+  - verifies: https://issues.redhat.com/browse/RHEL-21829
+  - verifies: https://issues.redhat.com/browse/RHEL-21830
+  - verifies: https://issues.redhat.com/browse/RHEL-21831
+  - verifies: https://issues.redhat.com/browse/RHEL-21832
+  - verifies: https://issues.redhat.com/browse/RHEL-21833
+  - verifies: https://issues.redhat.com/browse/RHEL-21834
+  - verifies: https://issues.redhat.com/browse/RHEL-1506
+  - verifies: https://issues.redhat.com/browse/RHEL-9716
+  - verifies: https://issues.redhat.com/browse/RHEL-21823
+  - verifies: https://issues.redhat.com/browse/RHEL-21824
+  - verifies: https://issues.redhat.com/browse/RHEL-21825
+  - verifies: https://issues.redhat.com/browse/RHEL-21826
+  - verifies: https://issues.redhat.com/browse/RHEL-21827
+  - verifies: https://issues.redhat.com/browse/RHEL-21828
