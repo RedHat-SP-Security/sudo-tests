@@ -63,7 +63,6 @@ rlJournalStart && {
         rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'log_output'"
         rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'log_input'"
         rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'iolog_dir=/var/log/sudo-io'"
-        #rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'log_format=json'"
         rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'logfile=/var/log/sudo.log'"
         rlRun "sudoAddOptionToSudoRule --nowait 'defaults' 'sudoOption' 'syslog=authpriv'"
 
