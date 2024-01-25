@@ -2,7 +2,6 @@ description: test loggin of the terminal control characters
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require+:
-  - library(sudo/common)
   - library(distribution/tcf)
   - library(distribution/Cleanup)
   - library(distribution/testUser)
