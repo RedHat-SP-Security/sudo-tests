@@ -7,8 +7,12 @@ test: ./runtest.sh
 require:
 - library(distribution/testUser)
 - library(distribution/Cleanup)
-- library(pam/basic)
-- library(sudo/common)
+- name: /Library/basic
+  url: https://pkgs.devel.redhat.com/git/tests/pam
+  type: library
+- name: /Library/common
+  url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+  type: library
 recommend:
 - sudo
 - pam

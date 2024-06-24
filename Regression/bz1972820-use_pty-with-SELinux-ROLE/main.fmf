@@ -2,7 +2,9 @@ summary: 'Defaults use_pty plus SELinux ROLE in user specification breaks termin
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require+:
-- library(sudo/common)
+- name: /Library/common
+  url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+  type: library
 - library(ControlFlow/Cleanup)
 - library(distribution/testUser)
 - expect
