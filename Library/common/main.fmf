@@ -6,4 +6,6 @@ contact:
 require:
   - sudo
 provide:
-  - library(sudo/common)
+  - name: /Library/common
+    url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+    type: library

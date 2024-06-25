@@ -6,7 +6,9 @@ component:
 test: ./runtest.sh
 require:
   - library(distribution/testUser)
-  - library(sudo/common)
+  - name: /Library/common
+    url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+    type: library
   - sudo
   - sudo-python-plugin
   - expect
