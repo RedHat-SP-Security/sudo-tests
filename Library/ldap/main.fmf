@@ -9,8 +9,6 @@ require:
 - library(distribution/authconf)
 - sudo
 provide:
-  - name: /Library/ldap
-    url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
-    type: library
+  - library(sudo/ldap)
 duration: 5m
 extra-task: /CoreOS/sudo/Library/ldap

@@ -11,7 +11,7 @@ require:
   url: https://pkgs.devel.redhat.com/git/tests/pam
   type: library
 - name: /Library/common
-  url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+  url: https://github.com/RedHat-SP-Security/sudo-tests
   type: library
 recommend:
 - sudo

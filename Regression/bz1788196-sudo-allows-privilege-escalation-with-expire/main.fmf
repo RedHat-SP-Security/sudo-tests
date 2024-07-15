@@ -8,7 +8,7 @@ require:
 - library(distribution/Cleanup)
 - library(distribution/testUser)
 - name: /Library/common
-  url: https://gitlab.cee.redhat.com/special-projects/tests/sudo
+  url: https://github.com/RedHat-SP-Security/sudo-tests
   type: library
 recommend:
 - sudo
