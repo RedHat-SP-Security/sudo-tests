@@ -33,7 +33,8 @@
 rlJournalStart && {
   rlPhaseStartSetup && {
     rlRun "rlImport --all" 0 "Import libraries" || rlDie "cannot continue"
-    rlRun "rlCheckMakefileRequires" || rlDie "cannot continue"
+    rlRun "rlCheckRequired" || rlDie "cannot continue"
+    rlRun "rlCheckRecommended" 0-255
     rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
     CleanupRegister "rlRun 'rm -r $TmpDir' 0 'Removing tmp directory'"
     CleanupRegister 'rlRun "popd"'

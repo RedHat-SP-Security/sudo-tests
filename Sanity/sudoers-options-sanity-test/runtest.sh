@@ -34,7 +34,7 @@ rlJournalStart && {
   rlPhaseStartSetup && {
     rlRun "rlImport --all" 0 "Import libraries" || rlDie "cannot continue"
     tcfTry "Setup phase" && {
-      tcfRun "rlCheckMakefileRequires"
+      tcfRun "rlCheckRequired"
       rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
       CleanupRegister "rlRun 'rm -r $TmpDir' 0 'Removing tmp directory'"
       CleanupRegister 'rlRun "popd"'

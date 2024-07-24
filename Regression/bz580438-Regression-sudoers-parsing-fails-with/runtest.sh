@@ -42,7 +42,8 @@ _LOG_FILE="sudo.log"
 
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "rlCheckMakefileRequires"
+	rlRun "rlCheckRequired" || rlDie "cannot continue"
+	rlRun "rlCheckRecommended" 0-255
 	rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
 	_LOG_FILE="${TmpDir}/${_LOG_FILE}"
 	rlRun "pushd $TmpDir"

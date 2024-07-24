@@ -36,7 +36,7 @@ _CONFIG_P="/etc/shadow"
 
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "rlCheckMakefileRequires"  || rlDie "cannot continue"
+        rlRun "rlCheckRequired"  || rlDie "cannot continue"
 	rlRun "rlImport --all" || rlDie "cannot continue"
         rlRun "TmpDir=\$(mktemp -d)" 0 "Creating tmp directory"
         CleanupRegister 'rlRun "popd"'
