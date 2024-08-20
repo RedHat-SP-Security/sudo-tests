@@ -7,9 +7,7 @@ test: ./runtest.sh
 require:
 - library(distribution/testUser)
 - library(distribution/Cleanup)
-- name: /Library/basic
-  url: https://pkgs.devel.redhat.com/git/tests/pam
-  type: library
+- library(pam/pam)
 - name: /Library/common
   url: https://github.com/RedHat-SP-Security/sudo-tests
   type: library
