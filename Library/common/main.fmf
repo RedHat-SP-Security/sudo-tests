@@ -5,5 +5,3 @@ contact:
   - Dalibor Pospisil <dapospis@redhat.com>
 require:
   - sudo
-provide:
-  - library(sudo/common)

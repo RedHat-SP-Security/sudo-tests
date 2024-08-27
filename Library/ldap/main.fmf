@@ -8,7 +8,5 @@ require:
   type: library
 - library(distribution/authconf)
 - sudo
-provide:
-  - library(sudo/ldap)
 duration: 5m
 extra-task: /CoreOS/sudo/Library/ldap
