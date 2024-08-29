@@ -39,7 +39,7 @@ rlJournalStart && {
     rlRun "pushd $TmpDir"
     CleanupRegister 'rlRun "rlFileRestore"'
     rlRun "rlFileBackup --clean /etc/sudoers"
-    CleanupRegister "rlRun 'sessionRun reset'; rlRun 'sessionClose'"
+    CleanupRegister "rlRun 'sessionClose'"
     rlRun "sessionOpen"
     rlRun "echo 'Defaults !authenticate' >> /etc/sudoers"
     export sessionExpectTIMEOUT=5 sessionRunTIMEOUT=5
