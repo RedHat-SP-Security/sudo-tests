@@ -20,6 +20,7 @@ tag:
 - Tier1security
 - TierCandidatesPASS
 - rhel-7.4
+- destructive-test
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/run-as
 extra-task: /CoreOS/sudo/Sanity/run-as
