@@ -2,7 +2,9 @@ description: More symlinks with the same targets get command substitued
 contact: Daalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 duration: 2m
-enabled: true
+#fix is not implemented
+#https://issues.redhat.com/browse/RHEL-14024
+enabled: false
 tag:
   - Tier1
   - CI-Tier-1
