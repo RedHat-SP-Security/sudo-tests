@@ -48,7 +48,7 @@ rlJournalStart && {
   rlPhaseEnd; }
 
   while IFS=';' read -r title options edit ec; do
-    rlPhaseStartTest "$title" && {
+    rlPhaseStartTest "Title - $title" && {
       rlRun "sessionRun --timeout 5 'EDITOR=vi sudoedit $options ./test_file'" 254
       [[ "$?" == "254" ]] && {
         rlRun "sessionExpect 'test_file_content'" 0 "wait for the fiel content to show up"
