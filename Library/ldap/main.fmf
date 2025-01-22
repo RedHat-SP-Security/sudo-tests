@@ -3,11 +3,14 @@ summary: Basic library for manipulation with sudoers entries in ldap via sudo-ld
 contact:
 - David Spurek <dspurek@redhat.com>
 require:
-- name: /Library/basic
-  url: https://pkgs.devel.redhat.com/git/tests/authconfig
-  type: library
-- library(distribution/authconf)
 - sudo
+adjust:
+  - require+:
+    - name: /Library/basic
+      url: https://pkgs.devel.redhat.com/git/tests/authconfig
+      type: library
+    - library(distribution/authconf)
+    when: distro < rhel-9
 provide:
   - library(sudo/ldap)
 duration: 5m
