@@ -4,11 +4,11 @@ contact:
 - David Spurek <dspurek@redhat.com>
 require:
 - sudo
+- name: /Library/basic
+  url: https://pkgs.devel.redhat.com/git/tests/authconfig
+  type: library
 adjust:
   - require+:
-    - name: /Library/basic
-      url: https://pkgs.devel.redhat.com/git/tests/authconfig
-      type: library
     - library(distribution/authconf)
     when: distro < rhel-9
 provide:
