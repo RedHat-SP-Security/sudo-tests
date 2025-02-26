@@ -45,6 +45,7 @@ rlJournalStart && {
       find_path() {
         local distro ver p
         distro="$(. /etc/os-release; echo "$ID")"
+        [ "$distro" == "centos" ] && distro="rhel"
         ver=($(. /etc/os-release; echo "$VERSION_ID" | grep -o '[0-9]\+'))
         rlLogDebug "$FUNCNAME(): distro=$distro, ver=( ${ver[*]} )"
         while :; do
