@@ -34,10 +34,10 @@ recommend:
 - sudo
 - ElectricFence
 duration: 10m
-enabled: true
+enabled: false
 adjust:
-- enabled: false
-  when: distro > rhel-7
+- enabled: true
+  when: distro =< rhel-7
 tag:
 - CI-Tier-1
 - TIPpass_Security
