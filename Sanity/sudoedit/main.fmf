@@ -11,6 +11,7 @@ enabled: true
 tag:
   - CI-Tier-1
   - Tier1
+  - ImageMode
 tier: '1'
 extra-summary: /sudo/Sanity/sudoedit
 extra-nitrate: TC#0612659

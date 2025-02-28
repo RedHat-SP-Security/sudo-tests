@@ -6,6 +6,7 @@ require+:
 tag:
   - CI-Tier-1
   - Tier1
+  - ImageMode
 tier: '1'
 duration: 5m
 test: ./runtest.sh

@@ -21,6 +21,7 @@ tag:
 - TierCandidatesPASS
 - rhel-7.4
 - destructive-test
+- ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/run-as
 extra-task: /CoreOS/sudo/Sanity/run-as

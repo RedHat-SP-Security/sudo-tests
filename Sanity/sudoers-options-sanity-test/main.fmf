@@ -28,6 +28,7 @@ tag:
 - rhel-6.8
 - rhel-7.4
 - rhel-8.2
+- ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/sudoers-options-sanity-test
 extra-task: /CoreOS/sudo/Sanity/sudoers-options-sanity-test
