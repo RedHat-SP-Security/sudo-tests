@@ -25,6 +25,7 @@ tag:
 - TierCandidatesPASS
 - rhel-6.8
 - rhel-7.2
+- ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/default-sudo-config-files
 extra-task: /CoreOS/sudo/Sanity/default-sudo-config-files
