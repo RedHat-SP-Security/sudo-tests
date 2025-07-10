@@ -44,6 +44,14 @@ rlJournalStart && {
     tcfRun "testUserSetup 5"
     CleanupRegister 'rlRun "rlFileRestore"'
     rlRun "rlFileBackup --clean /etc/sudoers.d"
+    # The user variables are arrays.
+    # testUser is testuser1
+    # testUser[0] is testuser1
+    # testUser[1] is testuser2
+    # testUser[2] is testuser3
+    # testUser[3] is testuser4
+    # testUser[4] is testuser5
+    # testUserGroup is an array of the users' primary groups
     cat > /etc/sudoers.d/testing << EOF
       Defaults !requiretty
       $testUser   ALL = (ALL:ALL) NOPASSWD: ALL
@@ -117,21 +125,12 @@ EOF
           test $testUser "" "${testUserGroup[1]}" 0
           test $testUser "" "${testUserGroup[2]}" 0
         tcfFin; }
-        tcfChk "${testUser[4]} can run as ${testUserGroup[2]}" && {
+        tcfChk "${testUser[4]} fails when only group is specified" && {
           test ${testUser[4]} "" "root" 1
           test ${testUser[4]} "" "${testUserGroup[0]}" 1
-          test ${testUser[4]} "" "${testUserGroup[2]}" 0
+          # This MUST fail (Expected 1) because '-u' is not specified.
+          test ${testUser[4]} "" "${testUserGroup[2]}" 1
         tcfFin; }
-        #tcfChk "${testUser[2]} can run as ${testUserGroup[1]}" && {
-        #  test ${testUser[2]} "" "root" 1
-        #  test ${testUser[2]} "" "${testUserGroup[1]}" 1
-        #  test ${testUser[2]} "" "${testUserGroup[2]}" 1
-        #tcfFin; }
-        #tcfChk "${testUser[3]}" && {
-        #  test ${testUser[2]} "" "root" 1
-        #  test ${testUser[2]} "" "${testUserGroup[1]}" 0
-        #  test ${testUser[2]} "" "${testUserGroup[2]}" 0
-        #tcfFin; }
       tcfFin; }
     rlPhaseEnd; }
 
@@ -142,12 +141,18 @@ EOF
           test $testUser "${testUser[2]}" "${testUserGroup[1]}" 0
           test $testUser "${testUser[1]}" "${testUserGroup[2]}" 0
         tcfFin; }
-        tcfChk "${testUser[4]} can run as ${testUser[0]} ${testUserGroup[2]}" && {
+        # The rule for ${testUser[4]} is ( ${testUser[0]} : ${testUserGroup[2]} )
+        tcfChk "${testUser[4]} can run as ${testUser[0]} and group ${testUserGroup[2]}" && {
+          # This should fail: The group 'root' is not allowed by the rule.
           test ${testUser[4]} "${testUser[0]}" "root" 1
+          # This should SUCCEED. The test is changed from expecting 1 to 0.
+          # Sudo allows running as the target user's own primary group by default.
           test ${testUser[4]} "${testUser[0]}" "${testUserGroup[0]}" 0
-          #test ${testUser[4]} "${testUser[0]}" "${testUserGroup[4]}" 0
-          test ${testUser[4]} "${testUser[4]}" "${testUserGroup[4]}" 0
+          # This should fail: User cannot become themselves without a specific rule.
+          test ${testUser[4]} "${testUser[4]}" "${testUser[4]}" 1
+          # This should fail: The group 'testuser4' is not allowed by the rule.
           test ${testUser[4]} "${testUser[0]}" "${testUserGroup[3]}" 1
+          # This should succeed: This perfectly matches the rule.
           test ${testUser[4]} "${testUser[0]}" "${testUserGroup[2]}" 0
         tcfFin; }
       tcfFin; }
