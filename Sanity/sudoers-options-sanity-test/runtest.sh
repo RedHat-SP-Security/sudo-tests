@@ -42,10 +42,12 @@ rlJournalStart && {
       CleanupRegister 'rlRun "rlFileRestore"'
       rlRun "rlFileBackup --clean /etc/sudoers"
       rpm -V sudo | grep /etc/sudoers && {
-        # we need clean config file that is shipped with package
-        rlRun "rm -rf /etc/sudoers"
+        # Download the package that contains the original file
         rlRun "rlRpmDownload `rpm -q --qf '%{name} %{version} %{release} %{arch}' sudo`"
-        rlRun "yum -y reinstall ./sudo*"
+        # Extract only the sudoers file, overwriting the current one
+        rlRun "rpm2cpio ./sudo-*.rpm | cpio -idv --unconditional ./etc/sudoers" 0 "Extracting fresh /etc/sudoers"
+        # Restore default permissions as a best practice
+        rlRun "chmod 0440 /etc/sudoers" 0 "Restoring permissions for /etc/sudoers"
       }; :
       CleanupRegister 'rlRun "testUserCleanup"'
       rlRun "testUserSetup 2"
