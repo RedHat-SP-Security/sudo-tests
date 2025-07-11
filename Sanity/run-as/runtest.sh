@@ -145,9 +145,8 @@ EOF
         tcfChk "${testUser[4]} can run as ${testUser[0]} and group ${testUserGroup[2]}" && {
           # This should fail: The group 'root' is not allowed by the rule.
           test ${testUser[4]} "${testUser[0]}" "root" 1
-          # This should SUCCEED. The test is changed from expecting 1 to 0.
-          # Sudo allows running as the target user's own primary group by default.
-          test ${testUser[4]} "${testUser[0]}" "${testUserGroup[0]}" 0
+          # This should fail: This don't match the rule.
+          test ${testUser[4]} "${testUser[0]}" "${testUserGroup[0]}" 1
           # This should fail: User cannot become themselves without a specific rule.
           test ${testUser[4]} "${testUser[4]}" "${testUser[4]}" 1
           # This should fail: The group 'testuser4' is not allowed by the rule.
