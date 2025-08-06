@@ -75,23 +75,26 @@ description: |
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
-- grep
-- sed
-- setsid
+  - sudo
+  - grep
+  - sed
+  - setsid
 duration: 10m
 enabled: true
 tag:
-- CI-Tier-1
-- TIPpass
-- TIPpass_Security
-- Tier1
-- Tier1security
-- TipWaived5
-- TipWaived6
-- fedora-wanted
-- rhel9-wanted
+  - CI-Tier-1
+  - TIPpass
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - TipWaived5
+  - TipWaived6
+  - fedora-wanted
+  - rhel9-wanted
 tier: '1'
-extra-summary: /CoreOS/sudo/Regression/bz580438-Regression-sudoers-parsing-fails-with
-extra-task: /CoreOS/sudo/Regression/bz580438-Regression-sudoers-parsing-fails-with
+extra-summary: 
+    /CoreOS/sudo/Regression/bz580438-Regression-sudoers-parsing-fails-with
+extra-task: 
+    /CoreOS/sudo/Regression/bz580438-Regression-sudoers-parsing-fails-with
 extra-nitrate: TC#0062387
+id: 6a35d02f-6a45-4e76-a541-aca6f3e1ce93

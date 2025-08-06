@@ -5,32 +5,33 @@ description: |
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require:
-- library(distribution/dpcommon)
+  - library(distribution/dpcommon)
 recommend:
-- sudo
-- /usr/bin/rpm2cpio
-- cpio
+  - sudo
+  - /usr/bin/rpm2cpio
+  - cpio
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- NoRHEL4
-- NoRHEL5
-- SP-TBU
-- TIP_fedora_fail
-- TIPpass
-- TIPpass_Security
-- Tier1
-- Tier1security
-- TierCandidatesPASS
-- rhel-6.8
-- rhel-7.2
-- ImageMode
+  - CI-Tier-1
+  - NoRHEL4
+  - NoRHEL5
+  - SP-TBU
+  - TIP_fedora_fail
+  - TIPpass
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - TierCandidatesPASS
+  - rhel-6.8
+  - rhel-7.2
+  - ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/default-sudo-config-files
 extra-task: /CoreOS/sudo/Sanity/default-sudo-config-files
 extra-nitrate: TC#0497419
 adjust:
--   enabled: false
+  - enabled: false
     when: distro < rhel-7
     continue: false
+id: bafc2b68-2658-4714-9120-eb5929b92f0a

@@ -1,19 +1,21 @@
-summary: 'Defaults use_pty plus SELinux ROLE in user specification breaks terminal'
+summary: Defaults use_pty plus SELinux ROLE in user specification breaks 
+    terminal
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require+:
-- name: /Library/common
-  url: https://github.com/RedHat-SP-Security/sudo-tests
-  type: library
-- library(ControlFlow/Cleanup)
-- library(distribution/testUser)
-- expect
+  - name: /Library/common
+    url: https://github.com/RedHat-SP-Security/sudo-tests
+    type: library
+  - library(ControlFlow/Cleanup)
+  - library(distribution/testUser)
+  - expect
 duration: 5m
 enabled: true
 tag:
-- Tier3
+  - Tier3
 tier: '3'
 link:
-- verifies: https://bugzilla.redhat.com/show_bug.cgi?id=1972820
+  - verifies: https://bugzilla.redhat.com/show_bug.cgi?id=1972820
 extra-summary: /sudo/Regression/bz1972820-use_pty-with-SELinux-ROLE
 extra-nitrate: TC#0611729
+id: dfffd0bc-2c36-436e-89f3-cd49c5abfe76

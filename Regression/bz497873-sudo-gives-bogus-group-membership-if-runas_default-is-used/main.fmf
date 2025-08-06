@@ -3,18 +3,21 @@ description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
+  - sudo
 duration: 10m
 enabled: true
 tag:
-- CI-Tier-1
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
-- fedora-wanted
-- rhel9-wanted
+  - CI-Tier-1
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - fedora-wanted
+  - rhel9-wanted
 tier: '1'
-extra-summary: /CoreOS/sudo/Regression/bz497873-sudo-gives-bogus-group-membership-if-runas_default-is-used
-extra-task: /CoreOS/sudo/Regression/bz497873-sudo-gives-bogus-group-membership-if-runas_default-is-used
+extra-summary: 
+    /CoreOS/sudo/Regression/bz497873-sudo-gives-bogus-group-membership-if-runas_default-is-used
+extra-task: 
+    /CoreOS/sudo/Regression/bz497873-sudo-gives-bogus-group-membership-if-runas_default-is-used
 extra-nitrate: TC#0061950
+id: e7cb680c-97a4-466c-a0d8-48961af63ab9

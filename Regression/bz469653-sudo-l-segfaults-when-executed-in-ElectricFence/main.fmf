@@ -28,22 +28,25 @@ description: |
     distro > rhel-7: False
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 component:
-- sudo
+  - sudo
 test: ./runtest.sh
 recommend:
-- sudo
-- ElectricFence
+  - sudo
+  - ElectricFence
 duration: 10m
 enabled: false
 adjust:
-- enabled: true
-  when: distro =< rhel-7
+  - enabled: true
+    when: distro =< rhel-7
 tag:
-- CI-Tier-1
-- TIPpass_Security
-- Tier1
-- Tier1security
+  - CI-Tier-1
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
 tier: '1'
 extra-nitrate: TC#0062384
-extra-summary: /CoreOS/sudo/Regression/bz469653-sudo-l-segfaults-when-executed-in-ElectricFence
-extra-task: /CoreOS/sudo/Regression/bz469653-sudo-l-segfaults-when-executed-in-ElectricFence
+extra-summary: 
+    /CoreOS/sudo/Regression/bz469653-sudo-l-segfaults-when-executed-in-ElectricFence
+extra-task: 
+    /CoreOS/sudo/Regression/bz469653-sudo-l-segfaults-when-executed-in-ElectricFence
+id: 22a8a3c3-edde-4137-8fbb-b8ecee230da0

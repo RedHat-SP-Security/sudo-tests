@@ -5,28 +5,31 @@ description: |
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require:
-- library(distribution/Cleanup)
-- library(distribution/testUser)
-- name: /Library/common
-  url: https://github.com/RedHat-SP-Security/sudo-tests
-  type: library
+  - library(distribution/Cleanup)
+  - library(distribution/testUser)
+  - name: /Library/common
+    url: https://github.com/RedHat-SP-Security/sudo-tests
+    type: library
 recommend:
-- sudo
-- expect
+  - sudo
+  - expect
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- NoRHEL4
-- NoRHEL5
-- Tier2
-- rhel-7.9
-- rhel-8.3.0
+  - CI-Tier-1
+  - NoRHEL4
+  - NoRHEL5
+  - Tier2
+  - rhel-7.9
+  - rhel-8.3.0
 tier: '2'
-extra-summary: /CoreOS/sudo/Regression/bz1788196-sudo-allows-privilege-escalation-with-expire
-extra-task: /CoreOS/sudo/Regression/bz1788196-sudo-allows-privilege-escalation-with-expire
+extra-summary: 
+    /CoreOS/sudo/Regression/bz1788196-sudo-allows-privilege-escalation-with-expire
+extra-task: 
+    /CoreOS/sudo/Regression/bz1788196-sudo-allows-privilege-escalation-with-expire
 extra-nitrate: TC#0606159
 adjust:
--   enabled: false
+  - enabled: false
     when: distro < rhel-7
     continue: false
+id: a78cb23f-0fad-431d-aa07-5d88ebdb85c8

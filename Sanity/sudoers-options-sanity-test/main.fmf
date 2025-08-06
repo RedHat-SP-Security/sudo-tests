@@ -1,39 +1,40 @@
-summary: This sanity test checks pre-defined (some are commented) options (examples)
-    in sudoers file.
+summary: This sanity test checks pre-defined (some are commented) options 
+    (examples) in sudoers file.
 description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require:
-- library(distribution/tcf)
-- library(distribution/Cleanup)
-- library(distribution/ConditionalPhases)
-- library(distribution/testUser)
+  - library(distribution/tcf)
+  - library(distribution/Cleanup)
+  - library(distribution/ConditionalPhases)
+  - library(distribution/testUser)
 recommend:
-- sudo
-- grep
-- coreutils
-- postfix
-- /usr/bin/unbuffer
+  - sudo
+  - grep
+  - coreutils
+  - postfix
+  - /usr/bin/unbuffer
 duration: 30m
 enabled: true
 tag:
-- CI-Tier-1
-- SP-TBU
-- TIPpass
-- TIPpass_FIPS
-- TIPpass_Security
-- Tier1
-- Tier1security
-- rhel-6.7
-- rhel-6.8
-- rhel-7.4
-- rhel-8.2
-- ImageMode
+  - CI-Tier-1
+  - SP-TBU
+  - TIPpass
+  - TIPpass_FIPS
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - rhel-6.7
+  - rhel-6.8
+  - rhel-7.4
+  - rhel-8.2
+  - ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/sudoers-options-sanity-test
 extra-task: /CoreOS/sudo/Sanity/sudoers-options-sanity-test
 extra-nitrate: TC#0240685
 adjust:
--   enabled: false
+  - enabled: false
     when: distro <= rhel-5
     continue: false
+id: a7662032-93cc-4745-9e66-e2e5c728b60d

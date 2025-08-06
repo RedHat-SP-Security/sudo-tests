@@ -3,16 +3,17 @@ description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
+  - sudo
 duration: 10m
 enabled: true
 tag:
-- CI-Tier-1
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
+  - CI-Tier-1
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
 tier: '1'
 extra-summary: /CoreOS/sudo/Regression/bz500942-sudo-su-user-test
 extra-task: /CoreOS/sudo/Regression/bz500942-sudo-su-user-test
 extra-nitrate: TC#0061952
+id: 163426ac-8e00-413c-b150-9de53371fe3a

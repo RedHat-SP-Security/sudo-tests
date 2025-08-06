@@ -1,4 +1,5 @@
-summary: Load the sudo python plugin examples provided in /usr/share/doc/sudo/examples
+summary: Load the sudo python plugin examples provided in 
+    /usr/share/doc/sudo/examples
 description: ''
 contact: Martin Zelený <mzeleny@redhat.com>
 component:
@@ -31,3 +32,4 @@ adjust:
 extra-nitrate: TC#0611615
 extra-summary: /CoreOS/sudo/Sanity/sudo-python-plugin-examples
 extra-task: /CoreOS/sudo/Sanity/sudo-python-plugin-examples
+id: 0be518a3-7bff-419e-8820-8d210912c41e

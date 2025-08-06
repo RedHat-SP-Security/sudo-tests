@@ -6,26 +6,29 @@ description: |
     See: https://tmt.readthedocs.io/en/latest/questions.html#nitrate-migration
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 component:
-- sudo
+  - sudo
 test: ./runtest.sh
 require:
-- library(distribution/testUser)
-- library(distribution/Cleanup)
+  - library(distribution/testUser)
+  - library(distribution/Cleanup)
 recommend:
-- sudo
+  - sudo
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- RHEL7
-- SP-TBU
-- TIPpass_Security
-- Tier1
+  - CI-Tier-1
+  - RHEL7
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
 tier: '1'
 adjust:
--   enabled: false
+  - enabled: false
     when: distro ~< rhel-7
     continue: false
 extra-nitrate: TC#0599537
-extra-summary: /CoreOS/sudo/Regression/bz1672876-Backporting-sudo-bug-with-expired-passwords
-extra-task: /CoreOS/sudo/Regression/bz1672876-Backporting-sudo-bug-with-expired-passwords
+extra-summary: 
+    /CoreOS/sudo/Regression/bz1672876-Backporting-sudo-bug-with-expired-passwords
+extra-task: 
+    /CoreOS/sudo/Regression/bz1672876-Backporting-sudo-bug-with-expired-passwords
+id: 9962697a-37db-46b2-834f-a219832765a8

@@ -5,32 +5,35 @@ description: |
 contact: Shridhar Gadekar <sgadekar@redhat.com>
 test: ./runtest.sh
 require:
-- library(distribution/testUser)
-- library(distribution/Cleanup)
-- library(pam/pam)
-- name: /Library/common
-  url: https://github.com/RedHat-SP-Security/sudo-tests
-  type: library
+  - library(distribution/testUser)
+  - library(distribution/Cleanup)
+  - library(pam/pam)
+  - name: /Library/common
+    url: https://github.com/RedHat-SP-Security/sudo-tests
+    type: library
 recommend:
-- sudo
-- pam
+  - sudo
+  - pam
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- NoRHEL4
-- NoRHEL5
-- TIPpass_Security
-- Tier2
-- rhel-7.6
+  - CI-Tier-1
+  - NoRHEL4
+  - NoRHEL5
+  - TIPpass_Security
+  - Tier2
+  - rhel-7.6
 tier: '2'
-extra-summary: /CoreOS/sudo/Regression/bz1664147-sudo-modifies-command-output-showing-Last-login
-extra-task: /CoreOS/sudo/Regression/bz1664147-sudo-modifies-command-output-showing-Last-login
+extra-summary: 
+    /CoreOS/sudo/Regression/bz1664147-sudo-modifies-command-output-showing-Last-login
+extra-task: 
+    /CoreOS/sudo/Regression/bz1664147-sudo-modifies-command-output-showing-Last-login
 extra-nitrate: TC#0590346
 adjust:
--   enabled: false
+  - enabled: false
     when: distro < rhel-8
     continue: false
--   enabled: false
+  - enabled: false
     when: distro ~< rhel-8.2
     continue: false
+id: e45bccc0-aa21-404a-a403-e7f329a0ac91

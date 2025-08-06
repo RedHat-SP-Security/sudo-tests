@@ -3,30 +3,31 @@ description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require:
-- library(distribution/tcf)
-- library(distribution/Cleanup)
-- library(distribution/testUser)
-- library(distribution/ConditionalPhases)
+  - library(distribution/tcf)
+  - library(distribution/Cleanup)
+  - library(distribution/testUser)
+  - library(distribution/ConditionalPhases)
 recommend:
-- sudo
+  - sudo
 duration: 5m
 enabled: true
 tag:
-- NoRHEL4
-- NoRHEL5
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
-- TierCandidatesPASS
-- rhel-7.4
-- destructive-test
-- ImageMode
+  - NoRHEL4
+  - NoRHEL5
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - TierCandidatesPASS
+  - rhel-7.4
+  - destructive-test
+  - ImageMode
 tier: '1'
 extra-summary: /CoreOS/sudo/Sanity/run-as
 extra-task: /CoreOS/sudo/Sanity/run-as
 extra-nitrate: TC#0547089
 adjust:
--   enabled: false
+  - enabled: false
     when: distro == rhel-4, rhel-5
     continue: false
+id: 0e6766a4-d0c1-47ca-8693-5ea440533383

@@ -5,19 +5,21 @@ description: |
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
+  - sudo
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
-- fedora-wanted
-- rhel-5.8
-- rhel9-wanted
+  - CI-Tier-1
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - fedora-wanted
+  - rhel-5.8
+  - rhel9-wanted
 tier: '1'
 extra-summary: ' /CoreOS/sudo/Regression/bz627543-The-Runas-Spec-are-ignored-in-sudoers-file '
-extra-task: /CoreOS/sudo/Regression/bz627543-The-Runas-Spec-are-ignored-in-sudoers-file
+extra-task: 
+    /CoreOS/sudo/Regression/bz627543-The-Runas-Spec-are-ignored-in-sudoers-file
 extra-nitrate: TC#0122813
+id: e5c83445-6485-48b4-be27-6a8a5109d9f9

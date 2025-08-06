@@ -13,3 +13,4 @@ test: ./runtest.sh
 summary: A sudoers sanity test
 extra-task: /CoreOS/sudo/Sanity/sudoers-sanity
 extra-nitrate: TC#0612869
+id: c01a004f-543e-4fc8-af27-471effc95ad0

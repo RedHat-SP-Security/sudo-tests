@@ -3,22 +3,23 @@ description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
+  - sudo
 duration: 5m
 enabled: true
 tag:
-- CI-Tier-1
-- RHEL61
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
-- ImageMode
+  - CI-Tier-1
+  - RHEL61
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
+  - ImageMode
 tier: '1'
 extra-summary: ' /CoreOS/sudo/Sanity/Timestamp-files'
 extra-task: /CoreOS/sudo/Sanity/Timestamp-files
 extra-nitrate: TC#0078070
 adjust:
--   enabled: false
+  - enabled: false
     when: distro < rhel-6
     continue: false
+id: 1031edfa-d1e3-4a78-b43c-e8c97ea24e1b

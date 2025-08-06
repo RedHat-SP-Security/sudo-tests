@@ -3,16 +3,19 @@ description: ''
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:
-- sudo
+  - sudo
 duration: 10m
 enabled: true
 tag:
-- CI-Tier-1
-- SP-TBU
-- TIPpass_Security
-- Tier1
-- Tier1security
+  - CI-Tier-1
+  - SP-TBU
+  - TIPpass_Security
+  - Tier1
+  - Tier1security
 tier: '1'
-extra-summary: /CoreOS/sudo/Regression/bz512191-unable-to-use-globs-to-restrict-arguements
-extra-task: /CoreOS/sudo/Regression/bz512191-unable-to-use-globs-to-restrict-arguements
+extra-summary: 
+    /CoreOS/sudo/Regression/bz512191-unable-to-use-globs-to-restrict-arguements
+extra-task: 
+    /CoreOS/sudo/Regression/bz512191-unable-to-use-globs-to-restrict-arguements
 extra-nitrate: TC#0061953
+id: 208a96e6-015b-4601-9857-62de85ca2094
