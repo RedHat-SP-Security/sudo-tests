@@ -39,14 +39,19 @@ def test_sudo__duplicate_sudo_user(client: Client, provider: GenericProvider):
     Note: This test can not run on IPA since it will not allow this case to happen.
     """
     provider.user("user-1").add()
+    provider.user("user-2").add()
+    provider.user("user-3").add()
     provider.sudorule("test").add(
-        user=["user-1", f"user-1@{client.sssd.default_domain}"], host="ALL", command="/bin/ls"
+        user=["user-1", "user-2", f"user-2@{client.sssd.default_domain}", "user-3"], host="ALL", command="/bin/ls"
     )
 
     client.sssd.common.sudo()
     client.sssd.start()
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "sudo command failed!"
+
+    # Try several users to make sure we don't mangle the list
+    for user in ["user-1", "user-2", "user-3"]:
+        assert client.auth.sudo.list(user, "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
+        assert client.auth.sudo.run(user, "Secret123", command="/bin/ls /root"), "sudo command failed!"
 
 
 @pytest.mark.importance("high")
