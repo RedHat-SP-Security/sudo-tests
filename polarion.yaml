@@ -1,0 +1,35 @@
+testcase:
+  required:
+    title:
+      transform:
+        pattern: "^(.*)$"
+        replace: "IDM-SUDO-TC: \\1"
+      validate: "IDM-SUDO-TC: (.+)"
+    setup:
+      format: pre
+    steps:
+    expectedresults:
+    customerscenario:
+    caseimportance:
+    requirement:
+  optional:
+    id:
+      default: "idm-sudo-tc::{{ item.id }}"
+    caseautomation:
+      default: "automated"
+    casecomponent:
+      default: "sudo"
+    status:
+      default: "approved"
+    subsystemteam:
+      default: "rhel-idm-sssd"
+    upstream:
+      default: "yes"
+    automation_script:
+      default: "{{ tests_url }}/{{ item.location.file }}#L{{ item.location.line }}"
+    testtype:
+      default: "functional"
+    caselevel:
+      default: "system"
+    teardown:
+      format: pre
