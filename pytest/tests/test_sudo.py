@@ -10,12 +10,13 @@ import re
 import time
 from datetime import datetime, timedelta
 
-import pytest
 from sssd_test_framework.roles.ad import AD
 from sssd_test_framework.roles.client import Client
 from sssd_test_framework.roles.generic import GenericADProvider, GenericProvider
 from sssd_test_framework.roles.ldap import LDAP
-from sssd_test_framework.topology import KnownTopology, KnownTopologyGroup
+from sssd_test_framework.topology import KnownTopology
+
+import pytest
 
 
 @pytest.mark.importance("critical")
