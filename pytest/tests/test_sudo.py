@@ -10,12 +10,13 @@ import re
 import time
 from datetime import datetime, timedelta
 
-import pytest
 from sssd_test_framework.roles.ad import AD
 from sssd_test_framework.roles.client import Client
 from sssd_test_framework.roles.generic import GenericADProvider, GenericProvider
 from sssd_test_framework.roles.ldap import LDAP
-from sssd_test_framework.topology import KnownTopology, KnownTopologyGroup
+from sssd_test_framework.topology import KnownTopology
+
+import pytest
 
 
 @pytest.mark.importance("critical")
@@ -377,7 +378,6 @@ def test_sudo__sudonotbefore_shorttime(client: Client, provider: LDAP):
 @pytest.mark.importance("low")
 @pytest.mark.ticket(bz=1925514, gh=5609)
 @pytest.mark.topology(KnownTopology.BareAD)
-@pytest.mark.topology(KnownTopology.BareIPA)
 @pytest.mark.topology(KnownTopology.BareLDAP)
 def test_sudo__refresh_random_offset(client: Client):
     """
