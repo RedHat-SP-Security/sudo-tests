@@ -2,4 +2,7 @@ component:
   - sudo
 require:
   - sudo
+  - url: https://github.com/RedHat-SP-Security/sudo-tests.git
+    name: /Library/common
+    type: library
 framework: beakerlib
