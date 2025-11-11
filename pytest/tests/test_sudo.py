@@ -377,7 +377,6 @@ def test_sudo__sudonotbefore_shorttime(client: Client, provider: LDAP):
 @pytest.mark.importance("low")
 @pytest.mark.ticket(bz=1925514, gh=5609)
 @pytest.mark.topology(KnownTopology.BareAD)
-@pytest.mark.topology(KnownTopology.BareIPA)
 @pytest.mark.topology(KnownTopology.BareLDAP)
 def test_sudo__refresh_random_offset(client: Client):
     """
