@@ -1,5 +1,4 @@
 provisioned_topologies:
-- bareclient
 - bareipa
 - bareldap
 domains:
