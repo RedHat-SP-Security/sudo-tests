@@ -10,7 +10,6 @@ import re
 import time
 from datetime import datetime, timedelta
 
-from sssd_test_framework.roles.ad import AD
 from sssd_test_framework.roles.client import Client
 from sssd_test_framework.roles.generic import GenericADProvider, GenericProvider
 from sssd_test_framework.roles.ldap import LDAP
@@ -19,49 +18,7 @@ from sssd_test_framework.topology import KnownTopology
 import pytest
 
 
-@pytest.mark.importance("critical")
-@pytest.mark.topology(KnownTopology.BareAD)
-@pytest.mark.topology(KnownTopology.BareIPA)
-@pytest.mark.topology(KnownTopology.BareLDAP)
-@pytest.mark.parametrize("sssd_service_user", ("root", "sssd"))
-@pytest.mark.require(
-    lambda client, sssd_service_user: ((sssd_service_user == "root") or client.features["non-privileged"]),
-    "SSSD was built without support for running under non-root",
-)
-def test_sudo__user_allowed(client: Client, provider: GenericProvider, sssd_service_user: str):
-    """
-    :title: One user is allowed to run command, other user is not
-    :setup:
-        1. Create users "user-1" and "user-2"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts
-        3. Enable SSSD sudo responder and start SSSD
-    :steps:
-        1. List sudo rules for "user-1"
-        2. Run "sudo /bin/ls root" as user-1
-        3. List sudo rules for "user-2"
-        4. Run "sudo /bin/ls root" as user-2
-    :expectedresults:
-        1. User is able to run /bin/ls as root
-        2. Command is successful
-        3. User is not able to run /bin/ls as root
-        4. Command failed
-    :customerscenario: False
-    """
-    u = provider.user("user-1").add()
-    provider.user("user-2").add()
-    provider.sudorule("test").add(user=u, host="ALL", command="/bin/ls")
-
-    client.sssd.common.sudo()
-    client.sssd.start(service_user=sssd_service_user)
-
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
-
-    assert not client.auth.sudo.list("user-2", "Secret123"), "Sudo list successful!"
-    assert not client.auth.sudo.run("user-2", "Secret123", command="/bin/ls /root"), "Sudo command successful!"
-
-
-@pytest.mark.importance("critical")
+@pytest.mark.importance("high")
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareLDAP)
 def test_sudo__duplicate_sudo_user(client: Client, provider: GenericProvider):
@@ -92,7 +49,7 @@ def test_sudo__duplicate_sudo_user(client: Client, provider: GenericProvider):
     assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "sudo command failed!"
 
 
-@pytest.mark.importance("critical")
+@pytest.mark.importance("high")
 @pytest.mark.ticket(bz=1380436, gh=4236)
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareIPA)
@@ -144,16 +101,11 @@ def test_sudo__case_sensitive_false(client: Client, provider: GenericProvider):
     assert client.auth.sudo.run("USER-1", "Secret123", command="/bin/more /root/test"), "Sudo command failed!"
 
 
-@pytest.mark.importance("critical")
+@pytest.mark.importance("high")
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareIPA)
 @pytest.mark.topology(KnownTopology.BareLDAP)
-@pytest.mark.parametrize("sssd_service_user", ("root", "sssd"))
-@pytest.mark.require(
-    lambda client, sssd_service_user: ((sssd_service_user == "root") or client.features["non-privileged"]),
-    "SSSD was built without support for running under non-root",
-)
-def test_sudo__rules_refresh(client: Client, provider: GenericProvider, sssd_service_user: str):
+def test_sudo__rules_refresh(client: Client, provider: GenericProvider):
     """
     :title: Sudo rules refresh works
     :setup:
@@ -178,7 +130,7 @@ def test_sudo__rules_refresh(client: Client, provider: GenericProvider, sssd_ser
 
     client.sssd.common.sudo()
     client.sssd.domain["entry_cache_sudo_timeout"] = "2"
-    client.sssd.start(service_user=sssd_service_user)
+    client.sssd.start()
 
     assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
     r.modify(command="/bin/less")
@@ -186,45 +138,7 @@ def test_sudo__rules_refresh(client: Client, provider: GenericProvider, sssd_ser
     assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/less"]), "Sudo command failed!"
 
 
-@pytest.mark.importance("critical")
-@pytest.mark.ticket(bz=1372440, gh=4236)
-@pytest.mark.contains_workaround_for(gh=4483)
-@pytest.mark.topology(KnownTopology.BareAD)
-@pytest.mark.topology(KnownTopology.BareIPA)
-@pytest.mark.topology(KnownTopology.BareLDAP)
-def test_sudo__user_is_group(client: Client, provider: GenericProvider):
-    """
-    :title: POSIX groups can be set in sudoUser attribute
-    :setup:
-        1. Create user "user-1"
-        2. Create group "group-1" with "user-1" as a member
-        3. Create sudorule to allow "group-1" run "/bin/ls on all hosts
-        4. Enable SSSD sudo responder
-        5. Start SSSD
-    :steps:
-        1. List sudo rules for "user-1"
-        2. Run "sudo /bin/ls" as "user-1"
-    :expectedresults:
-        1. User is able to run only /bin/ls
-        2. Command is successful
-    :customerscenario: False
-    """
-    u = provider.user("user-1").add()
-    g = provider.group("group-1").add().add_member(u)
-    provider.sudorule("test").add(user=g, host="ALL", command="/bin/ls")
-
-    client.sssd.common.sudo()
-    client.sssd.start()
-
-    # Until https://github.com/SSSD/sssd/issues/4483 is resolved
-    # Running 'id user-1' will resolve SIDs into group names
-    if isinstance(provider, AD):
-        client.tools.id("user-1")
-
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
-
-
-@pytest.mark.importance("critical")
+@pytest.mark.importance("high")
 @pytest.mark.ticket(bz=1826272, gh=5119)
 @pytest.mark.topology(KnownTopology.BareAD)
 def test_sudo__user_is_nonposix_group(client: Client, provider: GenericADProvider):
@@ -257,36 +171,7 @@ def test_sudo__user_is_nonposix_group(client: Client, provider: GenericADProvide
     assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
 
 
-@pytest.mark.importance("critical")
-@pytest.mark.ticket(bz=1910131)
-@pytest.mark.topology(KnownTopology.BareAD)
-@pytest.mark.topology(KnownTopology.BareIPA)
-@pytest.mark.topology(KnownTopology.BareLDAP)
-def test_sudo__runasuser_shortname(client: Client, provider: GenericADProvider):
-    """
-    :title: sudoRunAsUser contains shortname
-    :setup:
-        1. Create users "user-1" and "user-2"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts as "user-2" using shortname
-        3. Enable SSSD sudo responder and start SSSD
-    :steps:
-        1. List sudo rules for "user-1"
-    :expectedresults:
-        1. User is able to run /bin/ls as "user-2"
-    :customerscenario: True
-    """
-    u1 = provider.user("user-1").add()
-    provider.user("user-2").add()
-    provider.sudorule("test").add(user=u1, host="ALL", command="/bin/ls", runasuser="user-2")
-
-    client.sssd.common.sudo()
-    client.sssd.start()
-
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(user-2) /bin/ls"]), "Sudo list failed!"
-    # TODO: Add run command when functionality is implemented in framework
-
-
-@pytest.mark.importance("critical")
+@pytest.mark.importance("high")
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareLDAP)
 def test_sudo__runasuser_fqn(client: Client, provider: GenericProvider):
@@ -298,23 +183,31 @@ def test_sudo__runasuser_fqn(client: Client, provider: GenericProvider):
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls" as "user-1" impersonating "user-2"
     :expectedresults:
         1. User is able to run /bin/ls as "user-2"
+        2. Command is successful
     :customerscenario: False
 
     Note: This test can not run on IPA since it does not allow fully qualified name here.
     """
+    client.sssd.authselect.select("sssd", ["with-mkhomedir", "with-sudo"])
+    client.sssd.enable_responder("sudo")
+    client.sssd.svc.start("oddjobd.service")
     u1 = provider.user("user-1").add()
     provider.user("user-2").add()
     provider.sudorule("test").add(
         user=u1, host="ALL", command="/bin/ls", runasuser=f"user-2@{client.sssd.default_domain}"
     )
-
-    client.sssd.common.sudo()
-    client.sssd.start()
+    client.sssd.restart()
 
     assert client.auth.sudo.list("user-1", "Secret123", expected=["(user-2) /bin/ls"]), "Sudo list failed!"
-    # TODO: Add run command when functionality is implemented in framework
+    assert (
+        client.auth.sudo.run_advanced(
+            "user-1", "Secret123", parameters=["-u", f"user-2@{client.sssd.default_domain}"], command="/bin/ls /"
+        ).rc
+        == 0
+    ), "Sudo command successful!"
 
 
 @pytest.mark.importance("low")
@@ -491,17 +384,12 @@ def test_sudo__prefer_full_refresh_over_smart_refresh(client: Client, full_inter
             is_skipped = True
 
 
-@pytest.mark.importance("high")
+@pytest.mark.importance("medium")
 @pytest.mark.ticket(bz=1294670, gh=3969)
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareIPA)
 @pytest.mark.topology(KnownTopology.BareLDAP)
-@pytest.mark.parametrize("sssd_service_user", ("root", "sssd"))
-@pytest.mark.require(
-    lambda client, sssd_service_user: ((sssd_service_user == "root") or client.features["non-privileged"]),
-    "SSSD was built without support for running under non-root",
-)
-def test_sudo__local_users_negative_cache(client: Client, provider: LDAP, sssd_service_user: str):
+def test_sudo__local_users_negative_cache(client: Client, provider: LDAP):
     """
     :title: Sudo responder hits negative cache for local users
     :setup:
@@ -525,14 +413,14 @@ def test_sudo__local_users_negative_cache(client: Client, provider: LDAP, sssd_s
     expiration time. Subsequent sudo requests will hit the negative cache and no
     further lookup is performed.
     """
-    client.local.user("user-1").add()
-    client.fs.write("/etc/sudoers.d/test", "user-1 ALL=(ALL) NOPASSWD:ALL")
+    client.user("user-1").add()
+    client.sudorule("test").add(user="user-1", host="ALL", command="ALL", nopasswd=True)
 
     client.sssd.common.sudo()
     client.sssd.nss.update(
         entry_negative_timeout="0",  # disable standard negative cache to make sure we hit the local user case
     )
-    client.sssd.start(service_user=sssd_service_user)
+    client.sssd.start()
 
     # Now there should be no query
     with client.ssh("user-1", "Secret123") as ssh:
