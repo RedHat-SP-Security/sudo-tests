@@ -26,7 +26,7 @@ def test_sudo__duplicate_sudo_user(client: Client, provider: GenericProvider):
     :title: User is mentioned twice in sudoUser attribute, once with shortname and once with fully qualified name
     :setup:
         1. Create user "user-1"
-        2. Create sudorules to allow "user-1", "user-1@FQDN" run "/bin/ls on all hosts
+        2. Create sudorules to allow "user-1", "user-1@FQDN" run /bin/ls on all hosts
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. List sudo rules for "user-1"
@@ -58,30 +58,31 @@ def test_sudo__case_sensitive_false(client: Client, provider: GenericProvider):
     """
     :title: Sudo rules work correctly for case-insensitive domains
     :setup:
-        1. Create user "USER-1"
-        2. Create sudorule to allow "user-1" run "/bin/less" on all hosts
-        3. Create sudorule to allow "USER-1" run "/bin/more" on all hosts
-        4. Enable SSSD sudo responder, set "case_sensitive" to "false" and start SSSD
-        5. Create file "/root/test" with content "test"
+        1. Create user USER-1
+        2. Create sudorule to allow user-1 run /bin/ls on all hosts
+        3. Create sudorule to allow USER-1 run /bin/cat on all hosts
+        4. Enable SSSD sudo responder
+        5. Set "case_sensitive" to "false"
+        6. Start SSSD
     :steps:
-        1. List sudo rules for "user-1"
-        2. Run "sudo /bin/less /root/test" as user-1
-        3. Run "sudo /bin/more /root/test" as user-1
-        4. List sudo rules for "USER-1"
-        5. Run "sudo /bin/less /root/test" as USER-1
-        6. Run "sudo /bin/more /root/test" as USER-1
+        1. List sudo rules for user-1
+        2. Run "sudo /bin/ls root" as user-1
+        3. Run "sudo /bin/cat /root/test" as user-1
+        4. List sudo rules for USER-1
+        5. Run "sudo /bin/ls root" as USER-1
+        6. Run "sudo /bin/cat /root/test" as USER-1
     :expectedresults:
-        1. User is able to run /bin/less and /bin/more as root
+        1. User is able to run /bin/ls and /bin/cat as root
         2. Command is successful
         3. Command is successful
-        4. User is able to run /bin/less and /bin/more as root
+        4. User is able to run /bin/ls and /bin/cat as root
         5. Command is successful
         6. Command is successful
     :customerscenario: False
     """
     provider.user("USER-1").add()
-    provider.sudorule("lowercase").add(user="user-1", host="ALL", command="/bin/less")
-    provider.sudorule("uppsercase").add(user="USER-1", host="ALL", command="/bin/more")
+    provider.sudorule("lowercase").add(user="user-1", host="ALL", command="/bin/ls")
+    provider.sudorule("uppsercase").add(user="USER-1", host="ALL", command="/bin/cat")
     client.fs.write("/root/test", "test")
 
     client.sssd.common.sudo()
@@ -89,16 +90,16 @@ def test_sudo__case_sensitive_false(client: Client, provider: GenericProvider):
     client.sssd.start()
 
     assert client.auth.sudo.list(
-        "user-1", "Secret123", expected=["(root) /bin/less", "(root) /bin/more"]
+        "user-1", "Secret123", expected=["(root) /bin/ls", "(root) /bin/cat"]
     ), "Sudo list failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/less /root/test"), "Sudo command failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/more /root/test"), "Sudo command failed!"
+    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/cat /root/test"), "Sudo command failed!"
 
     assert client.auth.sudo.list(
-        "USER-1", "Secret123", expected=["(root) /bin/less", "(root) /bin/more"]
+        "USER-1", "Secret123", expected=["(root) /bin/ls", "(root) /bin/cat"]
     ), "Sudo list failed!"
-    assert client.auth.sudo.run("USER-1", "Secret123", command="/bin/less /root/test"), "Sudo command failed!"
-    assert client.auth.sudo.run("USER-1", "Secret123", command="/bin/more /root/test"), "Sudo command failed!"
+    assert client.auth.sudo.run("USER-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+    assert client.auth.sudo.run("USER-1", "Secret123", command="/bin/cat /root/test"), "Sudo command failed!"
 
 
 @pytest.mark.importance("high")
@@ -110,7 +111,7 @@ def test_sudo__rules_refresh(client: Client, provider: GenericProvider):
     :title: Sudo rules refresh works
     :setup:
         1. Create user "user-1"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts
+        2. Create sudorule to allow "user-1" run /bin/ls on all hosts
         3. Enable SSSD sudo responder
         4. Set "entry_cache_sudo_timeout" to "2" and start SSSD
     :steps:
@@ -147,7 +148,7 @@ def test_sudo__user_is_nonposix_group(client: Client, provider: GenericADProvide
     :setup:
         1. Create user "user-1"
         2. Create group non-posix "group-1" with "user-1" as a member
-        3. Create sudorule to allow "group-1" run "/bin/ls on all hosts
+        3. Create sudorule to allow "group-1" run /bin/ls on all hosts
         4. Enable SSSD sudo responder
         5. Disable ldap_id_mapping
         6. Start SSSD
@@ -179,7 +180,7 @@ def test_sudo__runasuser_fqn(client: Client, provider: GenericProvider):
     :title: sudoRunAsUser contains fully qualified name
     :setup:
         1. Create users "user-1" and "user-2"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts as "user-2" using fully qualified name
+        2. Create sudorule to allow "user-1" run /bin/ls on all hosts as "user-2" using fully qualified name
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. List sudo rules for "user-1"
@@ -218,7 +219,7 @@ def test_sudo__sudonotbefore_shorttime(client: Client, provider: LDAP):
     :description: Test that sudoNotBefore and sudoNotAfter works even without minutes and seconds specifier.
     :setup:
         1. Create user "user-1"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts within given time in %Y%m%d%H format
+        2. Create sudorule to allow "user-1" run /bin/ls on all hosts within given time in %Y%m%d%H format
         3. Enable SSSD sudo responder
         4. Set "sudo_timed" to "true"
         5. Start SSSD
