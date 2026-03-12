@@ -33,7 +33,7 @@ def test_basic__single_user(client: Client, provider: GenericProvider):
     :title: One user is allowed to run command, other user is not
     :setup:
         1. Create users "user-1" and "user-2"
-        2. Create sudorule to allow "user-1" run "/bin/ls on all hosts
+        2. Create sudorule to allow "user-1" run /bin/ls on all hosts
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. Run "sudo /bin/ls root" as user-1
@@ -68,7 +68,7 @@ def test_basic__multiple_users(client: Client, provider: GenericProvider):
     :title: User from list are allowed to run a command
     :setup:
         1. Create users "user-1", "user-2" and "user-deny"
-        2. Create sudorule to allow "user-1" and "user-2" run "/bin/ls on all hosts
+        2. Create sudorule to allow "user-1" and "user-2" run /bin/ls on all hosts
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. Run "sudo /bin/ls root" as user-1
@@ -109,7 +109,7 @@ def test_basic__single_group(client: Client, provider: GenericProvider):
     :setup:
         1. Create user "user-1"
         2. Create group "group-1" with "user-1" as a member
-        3. Create sudorule to allow "group-1" run "/bin/ls on all hosts
+        3. Create sudorule to allow "group-1" run /bin/ls on all hosts
         4. Enable SSSD sudo responder
         5. Start SSSD
     :steps:
@@ -149,7 +149,7 @@ def test_basic__multiple_groups(client: Client, provider: GenericProvider):
         1. Create users "user-1", "user-2" and "user-deny"
         2. Create group "group-1" with "user-1" as a member
         3. Create group "group-2" with "user-2" as a member
-        3. Create sudorule to allow "group-1", "group-2" run "/bin/ls on all hosts
+        3. Create sudorule to allow "group-1", "group-2" run /bin/ls on all hosts
         4. Enable SSSD sudo responder and start SSSD
     :steps:
         1. Run "sudo /bin/ls" as "user-1"
@@ -199,7 +199,7 @@ def test_basic__user_and_group(client: Client, provider: GenericProvider):
     :setup:
         1. Create user "user-1" and "user-2"
         2. Create group "group-1" with "user-1" as a member
-        3. Create sudorule to allow "group-1" and "user-2" run "/bin/ls on all hosts
+        3. Create sudorule to allow "group-1" and "user-2" run /bin/ls on all hosts
         4. Enable SSSD sudo responder and start SSSD
     :steps:
         1. Run "sudo /bin/ls" as "user-1"
@@ -240,7 +240,7 @@ def test_basic__multiple_commands(client: Client, provider: GenericProvider):
     :title: Multiple commands can be set in sudo rule
     :setup:
         1. Create user "user-1"
-        2. Create sudorule to allow "user-1" run "/bin/ls and /bin/df
+        2. Create sudorule to allow "user-1" run /bin/ls and /bin/df
         3. Enable SSSD sudo responder and start SSSD
     :steps:
         1. Run "sudo /bin/ls" as "user-1"
@@ -493,3 +493,231 @@ def test_basic__runasuser_and_runasgroup(client: Client, provider: GenericProvid
         ).rc
         == 0
     ), f"User {u1.name} failed to run sudo with command whoami as {u2.name} and {g1.name}!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareAD)
+@pytest.mark.topology(KnownTopology.BareIPA)
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.topology(KnownTopology.BareClient)
+@pytest.mark.parametrize(
+    "name",
+    [
+        "shortname",
+        "fqdn",
+        # "wildcard_shortname",
+        # "wildcard_fqdn"
+    ],
+)
+def test_basic__hostname_hostname(client: Client, provider: GenericProvider, name: str):
+    """
+    :title: Sudo rules work with various hostname formats
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule to allow "user-1" run /bin/ls on matching hostname
+        3. Create sudorule to allow "user-1" run /bin/df on different hostname
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+        2. Run "sudo /bin/df" as user-1
+    :expectedresults:
+        1. User is able to run /bin/ls as root
+        2. User is not able to run /bin/df as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    other_host = "other"
+
+    if name == "shortname":
+        allowed_host = client.host.hostname.split(".")[0]
+    elif name == "fqdn":
+        allowed_host = client.host.hostname
+        other_host = "other.test"
+    elif name == "wildcard_shortname":
+        allowed_host = f"*{client.host.hostname.split(".")[0][2:]}"
+    elif name == "wildcard_fqdn":
+        allowed_host = f"*{client.host.hostname[2:]}"
+    else:
+        raise ValueError(f"Invalid hostname type: {name}")
+
+    provider.sudorule("test1").add(user=u, host=allowed_host, command="/bin/ls")
+    provider.sudorule("test2").add(user=u, host=other_host, command="/bin/df")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "\
+       f"that should have been allowed on {allowed_host}."
+    assert not client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/df"
+    ), f"{name}: User {u.name} was able to run 'sudo /bin/df' that should have been blocked!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareAD)
+# @pytest.mark.topology(KnownTopology.BareIPA) # IPA does not allow ip addresses for sudo rules
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.topology(KnownTopology.BareClient)
+@pytest.mark.parametrize("name", ["ipv4", "ipv6"])
+def test_basic__hostname_ip(client: Client, provider: GenericProvider, name: str):
+    """
+    :title: Sudo rules work with various ip address formats
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule to allow "user-1" run /bin/ls on matching ip address
+        3. Create sudorule to allow "user-1" run /bin/df on different ip address
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+        2. Run "sudo /bin/df" as user-1
+    :expectedresults:
+        1. User is able to run /bin/ls as root
+        2. User is not able to run /bin/df as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+
+    # Grab the first interface name from the default route
+    res = client.host.conn.run("ip -o -4 route show to default")
+
+    # If the command failed, use eth0 as the interface name
+    device_name = "eth0"
+    if res.rc == 0:
+        try:
+            dev = res.stdout.split()[4].strip()
+            device_name = dev
+        except IndexError:
+            pass
+
+    if name == "ipv4":
+        allowed_host = client.net.ip(name=device_name).address
+        other_host = "10.20.30.40"
+    elif name == "ipv6":
+        _, allowed_host = client.net.ip(name=device_name).addresses
+        other_host = "::2"
+    else:
+        raise ValueError(f"Invalid IP address type: {name}")
+    # TODO: Add support network/netmasks, netgroup
+
+    provider.sudorule("test1").add(user=u, host=allowed_host, command="/bin/ls")
+    provider.sudorule("test2").add(user=u, host=other_host, command="/bin/df")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "\
+       f"that should have been allowed on {allowed_host}."
+    assert not client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/df"
+    ), f"{name}: User {u.name} was able to run 'sudo /bin/df' that should have been blocked!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.skip(reason="TODO: Figure out if this is a bug wrong documentation")
+# LDAP base backends do not allow any negations
+@pytest.mark.topology(KnownTopology.BareClient)
+@pytest.mark.parametrize("name", ["shortname", "fqdn"])
+def test_basic__hostname_excluded(client: Client, provider: GenericProvider, name: str):
+    """
+    :title: User is not allowed to run command on excluded host
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule to allow "user-1" run /bin/ls except on excluded host
+        3. Create sudorule to allow "user-1" run /bin/df with different excluded host
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+        2. Run "sudo /bin/df" as user-1
+    :expectedresults:
+        1. User is not able to run /bin/ls as root
+        2. User is able to run /bin/df as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    other_host = "other"
+
+    if name == "shortname":
+        excluded_host = client.host.hostname.split(".")[0]
+    elif name == "fqdn":
+        excluded_host = client.host.hostname
+        other_host = "other.test"
+    else:
+        raise ValueError(f"Invalid hostname type: {name}")
+
+    provider.sudorule("test1").add(user=u, host=f"!{excluded_host}", command="/bin/ls")
+    provider.sudorule("test2").add(user=u, host=f"!{other_host}", command="/bin/df")
+    client.sssd.restart()
+
+    assert not client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"{name}: User {u.name} was able to run 'sudo /bin/ls /root' that should have been blocked!"
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/df"
+    ), f"{name}: User {u.name} was unable to run 'sudo /bin/df' that should have been allowed!"
+
+
+@pytest.mark.importance("medium")
+@pytest.mark.topology(KnownTopology.BareAD)
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.topology(KnownTopology.BareClient)
+@pytest.mark.parametrize("name", ["localhost", "127.0.0.1", "::1"])
+def test_basic__hostname_localhost(client: Client, provider: GenericProvider, name: str):
+    """
+    :title: User is not allowed to run command on variations of "localhost"
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule to allow "user-1" run /bin/ls on localhost
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    provider.sudorule("test1").add(user=u, host=name, command="/bin/ls")
+    client.sssd.restart()
+
+    assert not client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"{name}: User {u.name} was able to run 'sudo /bin/ls /root' that should have been blocked!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareAD)
+@pytest.mark.topology(KnownTopology.BareIPA)
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__tags_nopasswd(client: Client, provider: GenericProvider):
+    """
+    :title: User is allowed to run command without password
+    :setup:
+        1. Create users "user-1"
+        2. Create sudorule to allow "user-1" run /bin/ls without password
+        2. Create sudorule to allow "user-1" run /bin/df with password required
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls root" as user-1
+        2. Run "sudo /bin/df" as user-1
+    :expectedresults:
+        1. User is able to run /bin/ls without password
+        2. User is not able to run /bin/df without password
+    :customerscenario: False
+    """
+
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    provider.sudorule("test").add(user=u, host="ALL", command="/bin/ls", nopasswd=True)
+    provider.sudorule("test2").add(user=u, host="ALL", command="/bin/df")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u.name, command="/bin/ls /root"
+    ), f"User {u.name} was unable to run 'sudo /bin/ls /root' that should have been allowed!"
+    assert not client.auth.sudo.run(
+        u.name, command="/bin/df"
+    ), f"User {u.name} was able to run 'sudo /bin/df' that should have been blocked!"
