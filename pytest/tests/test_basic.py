@@ -545,10 +545,10 @@ def test_basic__hostname_hostname(client: Client, provider: GenericProvider, nam
     provider.sudorule("test2").add(user=u, host=other_host, command="/bin/df")
     client.sssd.restart()
 
-    assert client.auth.sudo.run(
-        u.name, "Secret123", command="/bin/ls /root"
-    ), f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "\
-       f"that should have been allowed on {allowed_host}."
+    assert client.auth.sudo.run(u.name, "Secret123", command="/bin/ls /root"), (
+        f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "
+        f"that should have been allowed on {allowed_host}."
+    )
     assert not client.auth.sudo.run(
         u.name, "Secret123", command="/bin/df"
     ), f"{name}: User {u.name} was able to run 'sudo /bin/df' that should have been blocked!"
@@ -605,10 +605,10 @@ def test_basic__hostname_ip(client: Client, provider: GenericProvider, name: str
     provider.sudorule("test2").add(user=u, host=other_host, command="/bin/df")
     client.sssd.restart()
 
-    assert client.auth.sudo.run(
-        u.name, "Secret123", command="/bin/ls /root"
-    ), f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "\
-       f"that should have been allowed on {allowed_host}."
+    assert client.auth.sudo.run(u.name, "Secret123", command="/bin/ls /root"), (
+        f"{name}: User {u.name} was unable to run 'sudo /bin/ls /root' "
+        f"that should have been allowed on {allowed_host}."
+    )
     assert not client.auth.sudo.run(
         u.name, "Secret123", command="/bin/df"
     ), f"{name}: User {u.name} was able to run 'sudo /bin/df' that should have been blocked!"
