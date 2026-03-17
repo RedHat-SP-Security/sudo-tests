@@ -58,6 +58,38 @@ def test_basic__single_user(client: Client, provider: GenericProvider):
     ), f"User {u2.name} was able to run sudo with command /bin/ls!"
 
 
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__single_user_by_uid(client: Client, provider: GenericProvider):
+    """
+    :title: Sudo rule allows user specified by UID in sudoUser
+    :setup:
+        1. Create users "user-1" with UID 10001 and "user-2" with UID 10002 on provider
+        2. Create sudorule to allow user #10001 run /bin/ls on all hosts
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1 (UID 10001)
+        2. Run "sudo /bin/ls /root" as user-2 (UID 10002)
+    :expectedresults:
+        1. User with UID 10001 is able to run /bin/ls as root
+        2. User with UID 10002 is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u1 = provider.user("user-1").add(uid=10001)
+    u2 = provider.user("user-2").add(uid=10002)
+    provider.sudorule("test").add(user="#10001", host="ALL", command="/bin/ls")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u1.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u1.name} (UID 10001) failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u2.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u2.name} (UID 10002) was able to run sudo but should have been denied!"
+
+
 @pytest.mark.importance("critical")
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareIPA)
@@ -77,7 +109,7 @@ def test_basic__multiple_users(client: Client, provider: GenericProvider):
     :expectedresults:
         1. User "user-1" is able to run /bin/ls as root
         2. User "user-2" is able to run /bin/ls as root
-        3. User  "user-demy" is not able to run /bin/ls as root
+        3. User "user-deny" is not able to run /bin/ls as root
     :customerscenario: False
     """
     _setup_sudo(client, provider)
@@ -139,6 +171,81 @@ def test_basic__single_group(client: Client, provider: GenericProvider):
     ), f"User {u.name} failed to run sudo with command /bin/ls!"
 
 
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__single_group_by_gid(client: Client, provider: GenericProvider):
+    """
+    :title: POSIX group specified by GID in sudoUser is allowed to run command
+    :setup:
+        1. Create users "user-1" and "user-deny"
+        2. Create group "group-1" with GID 20001 and "user-1" as a member
+        3. Create sudorule to allow group #20001 run /bin/ls on all hosts
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1 (member of group 20001)
+        2. Run "sudo /bin/ls /root" as user-deny (not in group)
+    :expectedresults:
+        1. User in group with GID 20001 is able to run /bin/ls as root
+        2. User not in the group is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    u_deny = provider.user("user-deny").add()
+    g = provider.group("group-1").add(gid=20001).add_member(u)
+    provider.sudorule("test").add(user="%#20001", host="ALL", command="/bin/ls")
+    client.sssd.restart()
+
+    if isinstance(provider, AD):
+        client.tools.id(u.name)
+        client.tools.id(u_deny.name)
+
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u.name} (member of group GID 20001) failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u_deny.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_deny.name} was able to run sudo but should have been denied!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.contains_workaround_for(gh=4483)
+@pytest.mark.topology(KnownTopology.BareAD)
+def test_basic__nonposix_group(client: Client, provider: GenericProvider):
+    """
+    :title: Non-POSIX group in sudoUser is allowed to run command
+    :setup:
+        1. Create users "user-1" and "user-deny"
+        2. Create non-POSIX group "group-1" (no GID) with "user-1" as a member
+        3. Create sudorule to allow "group-1" run /bin/ls on all hosts
+        4. Enable SSSD sudo responder, disable ldap_id_mapping, and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1 (member of non-POSIX group-1)
+        2. Run "sudo /bin/ls /root" as user-deny (not in group)
+    :expectedresults:
+        1. User in non-POSIX group is able to run /bin/ls as root
+        2. User not in the group is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add(uid=10001, gid=10001)
+    u_deny = provider.user("user-deny").add(uid=10002, gid=10002)
+    g = provider.group("group-1").add().add_member(u)
+    provider.sudorule("test").add(user=g, host="ALL", command="/bin/ls")
+    client.sssd.domain["ldap_id_mapping"] = "false"
+    client.sssd.restart()
+
+    client.tools.id(u.name)
+    client.tools.id(u_deny.name)
+
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u.name} (member of non-POSIX group) failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u_deny.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_deny.name} was able to run sudo but should have been denied!"
+
+
 @pytest.mark.importance("critical")
 @pytest.mark.contains_workaround_for(gh=4483)
 @pytest.mark.topology(KnownTopology.BareClient)
@@ -184,7 +291,7 @@ def test_basic__multiple_groups(client: Client, provider: GenericProvider):
     ), f"User {u2.name} failed to run sudo with command /bin/ls!"
     assert not client.auth.sudo.run(
         u3.name, "Secret123", command="/bin/ls /root"
-    ), f"User {u3.name} was able to run sudo with command /bin/ls!"
+    ), f"User {u3.name} was able to run sudo with command /bin/ls but should not have been able to!"
 
 
 @pytest.mark.importance("critical")
@@ -227,6 +334,53 @@ def test_basic__user_and_group(client: Client, provider: GenericProvider):
     assert client.auth.sudo.run(
         u2.name, "Secret123", command="/bin/ls /root"
     ), f"User {u2.name} failed to run sudo with command /bin/ls!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.contains_workaround_for(gh=4483)
+@pytest.mark.topology(KnownTopology.BareAD)
+@pytest.mark.topology(KnownTopology.BareLDAP)
+# @pytest.mark.topology(KnownTopology.BareClient)
+# TODO: Implement netgroups for bare client
+# Note: Netgroups are not supported in sudo rules on IPA
+def test_basic__single_netgroup(client: Client, provider: GenericProvider):
+    """
+    :title: Netgroup can be set in sudoUser attribute
+    :setup:
+        1. Create user "user-1" and "user-deny"
+        2. Create netgroup "ng-1" with "user-1" as a member
+        3. Create sudorule to allow netgroup "+ng-1" run /bin/ls on all hosts
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as "user-1"
+        3. Run "sudo /bin/ls /root" as "user-deny"
+    :expectedresults:
+        1. User is able to run only /bin/ls
+        2. Command is successful for user in netgroup
+        3. Command is denied for user not in netgroup
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u = provider.user("user-1").add()
+    u_deny = provider.user("user-deny").add()
+    ng = provider.netgroup("ng-1").add().add_member(user=u)
+    provider.sudorule("test").add(user="+ng-1", host="ALL", command="/bin/ls")
+    client.sssd.restart()
+
+    if isinstance(provider, AD):
+        client.tools.id(u.name)
+        client.tools.id(u_deny.name)
+
+    assert client.auth.sudo.list(
+        u.name, "Secret123", expected=["(root) /bin/ls"]
+    ), f"User {u.name} has not /bin/ls in allowed commands!"
+    assert client.auth.sudo.run(
+        u.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u.name} failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u_deny.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_deny.name} was able to run sudo but should have been denied!"
 
 
 @pytest.mark.importance("critical")
@@ -303,7 +457,71 @@ def test_basic__excluded_command(client: Client, provider: GenericProvider):
     ), f"User {u.name} failed to run sudo with command /bin/ls!"
     assert not client.auth.sudo.run(
         u.name, "Secret123", command="/bin/df"
-    ), f"User {u.name} was able to run sudo with command /bin/df!"
+    ), f"User {u.name} was able to run sudo with command /bin/df but should not have been able to!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__excluded_user(client: Client, provider: GenericProvider):
+    """
+    :title: Excluded user is denied when rule allows ALL except that user
+    :setup:
+        1. Create users "user-allow" and "user-deny"
+        2. Create sudorule to allow ALL users except "user-deny" run /bin/ls on all hosts
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-allow
+        2. Run "sudo /bin/ls /root" as user-deny
+    :expectedresults:
+        1. User "user-allow" is able to run /bin/ls as root
+        2. User "user-deny" is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u_allow = provider.user("user-allow").add()
+    u_deny = provider.user("user-deny").add()
+    provider.sudorule("test").add(user=["ALL", f"!{u_deny.name}"], host="ALL", command="/bin/ls")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u_allow.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_allow.name} failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u_deny.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_deny.name} was able to run sudo but should have been denied!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__excluded_group(client: Client, provider: GenericProvider):
+    """
+    :title: Excluded group is denied when rule allows ALL except that group
+    :setup:
+        1. Create users "user-allow" and "user-deny"
+        2. Create group "group-deny" with "user-deny" as a member
+        3. Create sudorule to allow ALL users except group "group-deny" run /bin/ls on all hosts
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-allow
+        2. Run "sudo /bin/ls /root" as user-deny (member of group-deny)
+    :expectedresults:
+        1. User "user-allow" is able to run /bin/ls as root
+        2. User "user-deny" (in excluded group) is not able to run /bin/ls as root
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u_allow = provider.user("user-allow").add()
+    u_deny = provider.user("user-deny").add()
+    g_deny = provider.group("group-deny").add().add_member(u_deny)
+    provider.sudorule("test").add(user=["ALL", f"!%{g_deny.name}"], host="ALL", command="/bin/ls")
+    client.sssd.restart()
+
+    assert client.auth.sudo.run(
+        u_allow.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_allow.name} failed to run sudo with command /bin/ls!"
+    assert not client.auth.sudo.run(
+        u_deny.name, "Secret123", command="/bin/ls /root"
+    ), f"User {u_deny.name} (in excluded group) was able to run sudo but should have been denied!"
 
 
 @pytest.mark.importance("critical")
@@ -323,7 +541,7 @@ def test_basic__single_runasuser(client: Client, provider: GenericProvider):
         1. Run "sudo -u user-2 whoami" as "user-1"
         2. Run "sudo -u user-3 whoami" as "user-1"
     :expectedresults:
-        1. User "user-1" is able to run the command as "user-2"
+        1. User "user-1" is able to run the command as "user-2"; whoami prints "user-2"
         2. User "user-1" is not able to run the command as "user-3"
     :customerscenario: False
     """
@@ -340,12 +558,52 @@ def test_basic__single_runasuser(client: Client, provider: GenericProvider):
         client.tools.id(u2.name)
         client.tools.id(u3.name)
 
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u2.name], command="whoami")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command whoami as {u2.name}!"
+    assert u2.name in res.stdout.strip(), f"whoami output mismatch: expected {u2.name!r}, got {res.stdout!r}"
+
     assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u2.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {u2.name}!"
+        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u3.name], command="whoami").rc != 0
+    ), f"User {u1.name} was able to run sudo with command whoami as {u3.name} but should not have been able to!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__single_runasuser_by_uid(client: Client, provider: GenericProvider):
+    """
+    :title: Command can be run as user specified by UID in sudoRunAsUser
+    :setup:
+        1. Create user "user-1", "user-2" with UID 10002, and "user-3"
+        2. Create sudorule to allow "user-1" run as #10002 run whoami
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo -u user-2 whoami" as "user-1" (user-2 has UID 10002)
+        2. Run "sudo -u "#10002" whoami" as "user-1" (user-2 has UID 10002)
+        3. Run "sudo -u user-3 whoami" as "user-1"
+    :expectedresults:
+        1. User "user-1" is able to run the command as user with UID 10002; whoami prints "user-2"
+        2. User "user-1" is able to run the command as user with UID 10002; whoami prints "user-2"
+        3. User "user-1" is not able to run the command as "user-3"
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u1 = provider.user("user-1").add(uid=10001)
+    u2 = provider.user("user-2").add(uid=10002)
+    u3 = provider.user("user-3").add(uid=10003)
+    provider.sudorule("test").add(user=u1, host="ALL", runasuser="#10002", command="/usr/bin/whoami")
+    client.sssd.restart()
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u2.name], command="whoami")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command whoami as {u2.name} (UID 10002)!"
+    assert u2.name in res.stdout.strip(), f"whoami output mismatch: expected {u2.name!r}, got {res.stdout!r}"
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", "'#10002'"], command="whoami")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command whoami as {u2.name} (UID 10002)!"
+    assert u2.name in res.stdout.strip(), f"whoami output mismatch: expected {u2.name!r}, got {res.stdout!r}"
+
     assert (
-        not client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u3.name], command="whoami").rc == 0
-    ), f"User {u1.name} was able to run sudo with command whoami as {u3.name}!"
+        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u3.name], command="whoami").rc != 0
+    ), f"User {u1.name} was able to run sudo with command whoami as {u3.name} but should not have been able to!"
 
 
 @pytest.mark.importance("critical")
@@ -366,8 +624,8 @@ def test_basic__multiple_runasuser(client: Client, provider: GenericProvider):
         1. Run "sudo -u user-2 whoami" as "user-1"
         2. Run "sudo -u user-3 whoami" as "user-1"
     :expectedresults:
-        1. User "user-1" is able to run the command as "user-2"
-        2. User "user-1" is able to run the command as "user-3"
+        1. User "user-1" is able to run the command as "user-2"; whoami prints "user-2"
+        2. User "user-1" is able to run the command as "user-3"; whoami prints "user-3"
     :customerscenario: True
     """
     _setup_sudo(client, provider)
@@ -383,84 +641,127 @@ def test_basic__multiple_runasuser(client: Client, provider: GenericProvider):
         client.tools.id(u2.name)
         client.tools.id(u3.name)
 
-    assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u2.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {u2.name}!"
-    assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u3.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {u3.name}!"
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u2.name], command="whoami")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command whoami as {u2.name}!"
+    assert u2.name in res.stdout.strip(), f"whoami output mismatch: expected {u2.name!r}, got {res.stdout!r}"
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-u", u3.name], command="whoami")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command whoami as {u3.name}!"
+    assert u3.name in res.stdout.strip(), f"whoami output mismatch: expected {u3.name!r}, got {res.stdout!r}"
 
 
 @pytest.mark.importance("critical")
-@pytest.mark.contains_workaround_for(gh=4483)
 @pytest.mark.topology(KnownTopology.BareClient)
 def test_basic__single_runasgroup(client: Client, provider: GenericProvider):
     """
     :title: Command can be run as another group
     :setup:
         1. Create user "user-1"
-        3. Create sudorule to allow "user-1" run as "group-1" run whoami
+        3. Create sudorule to allow "user-1" run as "group-1" run id -g
         4. Enable SSSD sudo responder and start SSSD
     :steps:
-        1. Run "sudo -g group-1 whoami" as "user-1"
-        2. Run "sudo -g group-2 whoami" as "user-1"
+        1. Run "sudo -g group-1 id -g" as "user-1"
+        2. Run "sudo -g group-2 id -g" as "user-1"
     :expectedresults:
-        1. User "user-1" is able to run the command as "group-1"
+        1. User "user-1" is able to run the command as "group-1"; id -g prints group-1's GID
         2. User "user-1" is not able to run the command as "group-2"
     :customerscenario: False
     """
     _setup_sudo(client, provider)
-    u1 = provider.user("user-1").add()
-    g1 = provider.group("group-1").add()
-    g2 = provider.group("group-2").add()
-    provider.sudorule("test").add(user=u1, host="ALL", runasgroup=g1, command="/usr/bin/whoami")
+    u1 = provider.user("user-1").add(uid=10001)
+    g1 = provider.group("group-1").add(gid=20001)
+    g2 = provider.group("group-2").add(gid=20002)
+    provider.sudorule("test").add(user=u1, host="ALL", runasgroup=g1, command="/usr/bin/id -g")
     client.sssd.restart()
 
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g1.name], command="id -g")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {g1.name}!"
+    assert "20001" in res.stdout.strip(), f"id -g mismatch: expected 20001, got {res.stdout!r}"
+
     assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g1.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {g1.name}!"
+        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g2.name], command="id -g").rc != 0
+    ), f"User {u1.name} was able to run sudo with command id -g as {g2.name} but should not have been able to!"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_basic__single_runasgroup_by_gid(client: Client, provider: GenericProvider):
+    """
+    :title: Command can be run as group specified by GID in sudoRunAsGroup
+    :setup:
+        1. Create user "user-1"
+        2. Create group "group-1" with GID 20001 and "group-2"
+        3. Create sudorule to allow "user-1" run as #20001 run id -g
+        4. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. Run "sudo -g group-1 id -g" as "user-1" (group-1 has GID 20001)
+        2. Run "sudo -g '#20001' id -g" as "user-1" (group-1 has GID 20001)
+        3. Run "sudo -g group-2 id -g" as "user-1"
+    :expectedresults:
+        1. User "user-1" is able to run the command as group with GID 20001; id -g prints 20001
+        2. User "user-1" is able to run the command as group with GID 20001; id -g prints 20001
+        3. User "user-1" is not able to run the command as "group-2"
+    :customerscenario: False
+    """
+    _setup_sudo(client, provider)
+    u1 = provider.user("user-1").add(uid=10001)
+    g1 = provider.group("group-1").add(gid=20001)
+    g2 = provider.group("group-2").add(gid=20002)
+    provider.sudorule("test").add(user=u1, host="ALL", runasgroup="#20001", command="/usr/bin/id -g")
+    client.sssd.restart()
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", "'#20001'"], command="id -g")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {g1.name} (GID 20001)!"
+    assert "20001" in res.stdout.strip(), f"id -g mismatch: expected 20001, got {res.stdout!r}"
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g1.name], command="id -g")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {g1.name} (GID 20001)!"
+    assert "20001" in res.stdout.strip(), f"id -g mismatch: expected 20001, got {res.stdout!r}"
+
     assert (
-        not client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g2.name], command="whoami").rc == 0
-    ), f"User {u1.name} was able to run sudo with command whoami as {g2.name}!"
+        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g2.name], command="id -g").rc != 0
+    ), f"User {u1.name} was able to run sudo with command id -g as {g2.name} but should not have been able to!"
 
 
 @pytest.mark.importance("critical")
 @pytest.mark.contains_workaround_for(gh=4483)
 @pytest.mark.topology(KnownTopology.BareClient)
-def test_basic__multiple_runasgroup(client: Client, provider: GenericProvider):
+def test_basic__multiple_runasgroup(client: Cliewnt, provider: GenericProvider):
     """
     :title: Command can be run as another group from list
     :setup:
         1. Create user "user-1"
-        3. Create sudorule to allow "user-1" run as "group-1, group-2" run whoami
+        3. Create sudorule to allow "user-1" run as "group-1, group-2" run id -g
         4. Enable SSSD sudo responder and start SSSD
     :steps:
-        1. Run "sudo -g group-1 whoami" as "user-1"
-        2. Run "sudo -g group-2 whoami" as "user-1"
-        3. Run "sudo -g group-3 whoami" as "user-1"
+        1. Run "sudo -g group-1 id -g" as "user-1"
+        2. Run "sudo -g group-2 id -g" as "user-1"
+        3. Run "sudo -g group-3 id -g" as "user-1"
     :expectedresults:
-        1. User "user-1" is able to run the command as "group-1"
-        2. User "user-1" is able to run the command as "group-2"
+        1. User "user-1" is able to run the command as "group-1"; id -g prints group-1's GID
+        2. User "user-1" is able to run the command as "group-2"; id -g prints group-2's GID
         3. User "user-1" is not able to run the command as "group-3"
     :customerscenario: False
     """
     _setup_sudo(client, provider)
     u1 = provider.user("user-1").add()
-    g1 = provider.group("group-1").add()
-    g2 = provider.group("group-2").add()
-    g3 = provider.group("group-3").add()
-    provider.sudorule("test").add(user=u1, host="ALL", runasgroup=[g1, g2], command="/usr/bin/whoami")
+    g1 = provider.group("group-1").add(gid=20001)
+    g2 = provider.group("group-2").add(gid=20002)
+    g3 = provider.group("group-3").add(gid=20003)
+    provider.sudorule("test").add(user=u1, host="ALL", runasgroup=[g1, g2], command="/usr/bin/id -g")
     client.sssd.restart()
 
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g1.name], command="id -g")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {g1.name}!"
+    assert "20001" in res.stdout.strip(), f"id -g mismatch: expected 20001, got {res.stdout!r}"
+
+    res = client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g2.name], command="id -g")
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {g2.name}!"
+    assert "20002" in res.stdout.strip(), f"id -g mismatch: expected 20002, got {res.stdout!r}"
+
     assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g1.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {g1.name}!"
-    assert (
-        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g2.name], command="whoami").rc == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {g2.name}!"
-    assert (
-        not client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g3.name], command="whoami").rc == 0
-    ), f"User {u1.name} was able to run sudo with command whoami as {g3.name}!"
+        client.auth.sudo.run_advanced(u1.name, "Secret123", parameters=["-g", g3.name], command="id -g").rc != 0
+    ), f"User {u1.name} was able to run sudo with command id -g as {g3.name} but should not have been able to!"
 
 
 @pytest.mark.importance("critical")
@@ -471,28 +772,27 @@ def test_basic__runasuser_and_runasgroup(client: Client, provider: GenericProvid
     :title: Command can be run as another group or user
     :setup:
         1. Create user "user-1" and "user-2"
-        3. Create sudorule to allow "user-1" run as "group-1, user-2" run whoami
+        3. Create sudorule to allow "user-1" run as "group-1, user-2" run id -g
         4. Enable SSSD sudo responder and start SSSD
     :steps:
-        1. Run "sudo -u user-2 -g group-1 whoami" as "user-1"
+        1. Run "sudo -u user-2 -g group-1 id -g" as "user-1"
     :expectedresults:
-        1. User "user-1" is able to run the command as "user-2" and "group-1"
+        1. User "user-1" is able to run the command as "user-2" and "group-1"; id -g prints group-1's GID
     :customerscenario: False
     """
     _setup_sudo(client, provider)
-    u1 = provider.user("user-1").add()
-    u2 = provider.user("user-2").add()
-    g1 = provider.group("group-1").add()
+    u1 = provider.user("user-1").add(uid=10001)
+    u2 = provider.user("user-2").add(uid=10002)
+    g1 = provider.group("group-1").add(gid=20001)
 
-    provider.sudorule("test").add(user=u1, host="ALL", runasuser=u2, runasgroup=g1, command="/usr/bin/whoami")
+    provider.sudorule("test").add(user=u1, host="ALL", runasuser=u2, runasgroup=g1, command="/usr/bin/id -g")
     client.sssd.restart()
 
-    assert (
-        client.auth.sudo.run_advanced(
-            u1.name, "Secret123", parameters=["-u", u2.name, "-g", g1.name], command="whoami"
-        ).rc
-        == 0
-    ), f"User {u1.name} failed to run sudo with command whoami as {u2.name} and {g1.name}!"
+    res = client.auth.sudo.run_advanced(
+        u1.name, "Secret123", parameters=["-u", u2.name, "-g", g1.name], command="id -g"
+    )
+    assert res.rc == 0, f"User {u1.name} failed to run sudo with command id -g as {u2.name} and {g1.name}!"
+    assert "20001" in res.stdout.strip(), f"id -g mismatch: expected 20001, got {res.stdout!r}"
 
 
 @pytest.mark.importance("critical")
@@ -615,8 +915,7 @@ def test_basic__hostname_ip(client: Client, provider: GenericProvider, name: str
 
 
 @pytest.mark.importance("high")
-@pytest.mark.skip(reason="TODO: Figure out if this is a bug wrong documentation")
-# LDAP base backends do not allow any negations
+# Note: LDAP base backends do not allow negations for hostnames
 @pytest.mark.topology(KnownTopology.BareClient)
 @pytest.mark.parametrize("name", ["shortname", "fqdn"])
 def test_basic__hostname_excluded(client: Client, provider: GenericProvider, name: str):
@@ -647,8 +946,8 @@ def test_basic__hostname_excluded(client: Client, provider: GenericProvider, nam
     else:
         raise ValueError(f"Invalid hostname type: {name}")
 
-    provider.sudorule("test1").add(user=u, host=f"!{excluded_host}", command="/bin/ls")
-    provider.sudorule("test2").add(user=u, host=f"!{other_host}", command="/bin/df")
+    provider.sudorule("test1").add(user=u, host=f"ALL,!{excluded_host}", command="/bin/ls")
+    provider.sudorule("test2").add(user=u, host=f"ALL,!{other_host}", command="/bin/df")
     client.sssd.restart()
 
     assert not client.auth.sudo.run(
