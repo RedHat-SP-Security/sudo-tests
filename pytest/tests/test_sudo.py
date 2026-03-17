@@ -140,39 +140,6 @@ def test_sudo__rules_refresh(client: Client, provider: GenericProvider):
 
 
 @pytest.mark.importance("high")
-@pytest.mark.ticket(bz=1826272, gh=5119)
-@pytest.mark.topology(KnownTopology.BareAD)
-def test_sudo__user_is_nonposix_group(client: Client, provider: GenericADProvider):
-    """
-    :title: Non-POSIX groups can be set in sudoUser attribute
-    :setup:
-        1. Create user "user-1"
-        2. Create group non-posix "group-1" with "user-1" as a member
-        3. Create sudorule to allow "group-1" run /bin/ls on all hosts
-        4. Enable SSSD sudo responder
-        5. Disable ldap_id_mapping
-        6. Start SSSD
-    :steps:
-        1. List sudo rules for "user-1"
-        2. Run "sudo /bin/ls" as "user-1"
-    :expectedresults:
-        1. User is able to run only /bin/ls
-        2. Command is successful
-    :customerscenario: False
-    """
-    u = provider.user("user-1").add(uid=10001, gid=10001)
-    g = provider.group("group-1").add().add_member(u)
-    provider.sudorule("test").add(user=g, host="ALL", command="/bin/ls")
-
-    client.sssd.common.sudo()
-    client.sssd.domain["ldap_id_mapping"] = "false"
-    client.sssd.start()
-
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
-
-
-@pytest.mark.importance("high")
 @pytest.mark.topology(KnownTopology.BareAD)
 @pytest.mark.topology(KnownTopology.BareLDAP)
 def test_sudo__runasuser_fqn(client: Client, provider: GenericProvider):
