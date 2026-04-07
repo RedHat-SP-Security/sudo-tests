@@ -192,7 +192,7 @@ def test_basic__single_group_by_gid(client: Client, provider: GenericProvider):
     _setup_sudo(client, provider)
     u = provider.user("user-1").add()
     u_deny = provider.user("user-deny").add()
-    g = provider.group("group-1").add(gid=20001).add_member(u)
+    provider.group("group-1").add(gid=20001).add_member(u)
     provider.sudorule("test").add(user="%#20001", host="ALL", command="/bin/ls")
     client.sssd.restart()
 
@@ -364,7 +364,7 @@ def test_basic__single_netgroup(client: Client, provider: GenericProvider):
     _setup_sudo(client, provider)
     u = provider.user("user-1").add()
     u_deny = provider.user("user-deny").add()
-    ng = provider.netgroup("ng-1").add().add_member(user=u)
+    provider.netgroup("ng-1").add().add_member(user=u)
     provider.sudorule("test").add(user="+ng-1", host="ALL", command="/bin/ls")
     client.sssd.restart()
 
@@ -726,7 +726,7 @@ def test_basic__single_runasgroup_by_gid(client: Client, provider: GenericProvid
 @pytest.mark.importance("critical")
 @pytest.mark.contains_workaround_for(gh=4483)
 @pytest.mark.topology(KnownTopology.BareClient)
-def test_basic__multiple_runasgroup(client: Cliewnt, provider: GenericProvider):
+def test_basic__multiple_runasgroup(client: Client, provider: GenericProvider):
     """
     :title: Command can be run as another group from list
     :setup:
