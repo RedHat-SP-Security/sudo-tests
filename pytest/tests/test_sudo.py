@@ -6,6 +6,7 @@ SUDO Responder Tests.
 
 from __future__ import annotations
 
+import random
 import re
 import time
 from datetime import datetime, timedelta
@@ -471,3 +472,97 @@ def test_sudo__defaults_set_no_auth_and_sudo_rule_has_mandatory_auth(client: Cli
     assert client.auth.sudo.list("user-1", expected=["(root) PASSWD: ALL"]), "Sudo list failed!"
     assert not client.auth.sudo.run("user-1", command="/bin/ls /root"), "Sudo command successful!"
     assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.ticket(jira=["RHEL-115443"])
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.xfail(reason="SSSD bug: ldap_sudo_use_host_filter doesn't handle CIDR notation")
+def test_sudo__host_ipv4_cidr(client: Client, provider: LDAP):
+    """
+    :title: Sudo rule matches IPv4 CIDR mask in sudoHost
+    :description: Verifies sudo rules with IPv4 CIDR notation match IPs in range and deny IPs outside range
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule with CIDR 192.168.10.0/26 allowing /bin/ls
+        3. Create sudorule with CIDR 192.168.20.0/24 allowing /bin/cat
+        4. Create dummy interface with IP 192.168.10.5 (in first range, not in second)
+        5. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+        3. Run "sudo /bin/cat /etc/passwd" as user-1
+    :expectedresults:
+        1. User can list both sudo rules
+        2. /bin/ls succeeds (192.168.10.5 is within 192.168.10.0/26)
+        3. /bin/cat fails (192.168.10.5 is not within 192.168.20.0/24)
+    :customerscenario: True
+    """
+    dummy_name = f"dummy{random.randint(1000, 9999)}"
+
+    client.host.conn.run(f"ip link add {dummy_name} type dummy && ip link set {dummy_name} up")
+    client.host.conn.run(f"ip addr add 192.168.10.5/32 dev {dummy_name}")
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-ls").add(user="user-1", host="192.168.10.0/26", command="/bin/ls")
+        provider.sudorule("allow-cat").add(user="user-1", host="192.168.20.0/24", command="/bin/cat")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert client.auth.sudo.list("user-1", "Secret123"), "Sudo list failed!"
+        assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "CIDR match failed!"
+        assert not client.auth.sudo.run("user-1", "Secret123", command="/bin/cat /etc/passwd"), (
+            "CIDR non-match succeeded!"
+        )
+
+    finally:
+        client.host.conn.run(f"ip link delete {dummy_name}", raise_on_error=False)
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.ticket(jira=["RHEL-115443"])
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.xfail(reason="SSSD bug: ldap_sudo_use_host_filter doesn't handle CIDR notation")
+def test_sudo__host_ipv6_cidr(client: Client, provider: LDAP):
+    """
+    :title: Sudo rule matches IPv6 CIDR mask in sudoHost
+    :description: Verifies sudo rules with IPv6 CIDR notation match IPs in range and deny IPs outside range
+    :setup:
+        1. Create user "user-1"
+        2. Create sudorule with CIDR fd6d:8d64:af0c::/72 allowing /bin/ls
+        3. Create sudorule with CIDR fd6d:8d64:af0d::/72 allowing /bin/cat
+        4. Create dummy interface with IP fd6d:8d64:af0c::8 (in first range, not in second)
+        5. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+        3. Run "sudo /bin/cat /etc/passwd" as user-1
+    :expectedresults:
+        1. User can list both sudo rules
+        2. /bin/ls succeeds (fd6d:8d64:af0c::8 is within fd6d:8d64:af0c::/72)
+        3. /bin/cat fails (fd6d:8d64:af0c::8 is not within fd6d:8d64:af0d::/72)
+    :customerscenario: True
+    """
+    dummy_name = f"dummy{random.randint(1000, 9999)}"
+
+    client.host.conn.run(f"ip link add {dummy_name} type dummy && ip link set {dummy_name} up")
+    client.host.conn.run(f"ip -6 addr add fd6d:8d64:af0c::8/128 dev {dummy_name}")
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-ls").add(user="user-1", host="fd6d:8d64:af0c::/72", command="/bin/ls")
+        provider.sudorule("allow-cat").add(user="user-1", host="fd6d:8d64:af0d::/72", command="/bin/cat")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert client.auth.sudo.list("user-1", "Secret123"), "Sudo list failed!"
+        assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "CIDR match failed!"
+        assert not client.auth.sudo.run("user-1", "Secret123", command="/bin/cat /etc/passwd"), (
+            "CIDR non-match succeeded!"
+        )
+
+    finally:
+        client.host.conn.run(f"ip link delete {dummy_name}", raise_on_error=False)
