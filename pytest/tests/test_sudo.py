@@ -472,3 +472,105 @@ def test_sudo__defaults_set_no_auth_and_sudo_rule_has_mandatory_auth(client: Cli
     assert client.auth.sudo.list("user-1", expected=["(root) PASSWD: ALL"]), "Sudo list failed!"
     assert not client.auth.sudo.run("user-1", command="/bin/ls /root"), "Sudo command successful!"
     assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,client_ip",
+    [
+        ("ipv4_with_mask", "192.168.10.0/26", "192.168.10.5"),
+        ("ipv6", "fd6d:8d64:af0c::8", "fd6d:8d64:af0c::8"),
+        ("ipv6_with_mask", "fd6d:8d64:af0c::/72", "fd6d:8d64:af0c::8"),
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_allowed(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, client_ip: str
+):
+    """
+    :title: Sudo rule allows access with matching IPv4/IPv6 addresses and CIDR masks
+    :description: Verifies sudo rules work when client IP matches sudoHost configuration
+    :setup:
+        1. Configure client IP to match sudoHost rule
+        2. Create user and sudorule with IP-based sudoHost
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User can list sudo rules
+        2. User can execute sudo commands when IP matches
+    :customerscenario: True
+    """
+    # Configure client IP
+    if "ipv6" in ip_type:
+        client.host.ssh.run(f"ip -6 addr add {client_ip}/128 dev lo", raise_on_error=False)
+    else:
+        client.host.ssh.run(f"ip addr add {client_ip}/32 dev lo", raise_on_error=False)
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert client.auth.sudo.list("user-1", "Secret123"), f"Sudo list failed for sudoHost={host_value}!"
+        assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+    finally:
+        if "ipv6" in ip_type:
+            client.host.ssh.run(f"ip -6 addr del {client_ip}/128 dev lo", raise_on_error=False)
+        else:
+            client.host.ssh.run(f"ip addr del {client_ip}/32 dev lo", raise_on_error=False)
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,client_ip",
+    [
+        ("ipv4_with_mask", "192.168.10.0/26", "192.168.20.5"),
+        ("ipv6", "fd6d:8d64:af0c::8", "fd6d:8d64:af0c::9"),
+        ("ipv6_with_mask", "fd6d:8d64:af0c::/72", "fd6d:8d64:af0d::8"),
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_denied(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, client_ip: str
+):
+    """
+    :title: Sudo rule denies access with non-matching IPv4/IPv6 addresses
+    :description: Verifies sudo rules properly deny when client IP doesn't match sudoHost
+    :setup:
+        1. Configure client IP to NOT match sudoHost rule
+        2. Create user and sudorule with IP-based sudoHost
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User cannot list sudo rules
+        2. User cannot execute sudo commands when IP doesn't match
+    :customerscenario: True
+    """
+    # Configure client IP
+    if "ipv6" in ip_type:
+        client.host.ssh.run(f"ip -6 addr add {client_ip}/128 dev lo", raise_on_error=False)
+    else:
+        client.host.ssh.run(f"ip addr add {client_ip}/32 dev lo", raise_on_error=False)
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert not client.auth.sudo.list("user-1", "Secret123"), "Sudo list succeeded when it should fail!"
+        assert not client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command succeeded!"
+
+    finally:
+        if "ipv6" in ip_type:
+            client.host.ssh.run(f"ip -6 addr del {client_ip}/128 dev lo", raise_on_error=False)
+        else:
+            client.host.ssh.run(f"ip addr del {client_ip}/32 dev lo", raise_on_error=False)
