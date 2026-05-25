@@ -38,14 +38,19 @@ def test_sudo__duplicate_sudo_user(client: Client, provider: GenericProvider):
     Note: This test can not run on IPA since it will not allow this case to happen.
     """
     provider.user("user-1").add()
+    provider.user("user-2").add()
+    provider.user("user-3").add()
     provider.sudorule("test").add(
-        user=["user-1", f"user-1@{client.sssd.default_domain}"], host="ALL", command="/bin/ls"
+        user=["user-1", "user-2", f"user-2@{client.sssd.default_domain}", "user-3"], host="ALL", command="/bin/ls"
     )
 
     client.sssd.common.sudo()
     client.sssd.start()
-    assert client.auth.sudo.list("user-1", "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
-    assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "sudo command failed!"
+
+    # Try several users to make sure we don't mangle the list
+    for user in ["user-1", "user-2", "user-3"]:
+        assert client.auth.sudo.list(user, "Secret123", expected=["(root) /bin/ls"]), "Sudo list failed!"
+        assert client.auth.sudo.run(user, "Secret123", command="/bin/ls /root"), "sudo command failed!"
 
 
 @pytest.mark.importance("high")
@@ -466,3 +471,249 @@ def test_sudo__defaults_set_no_auth_and_sudo_rule_has_mandatory_auth(client: Cli
     assert client.auth.sudo.list("user-1", expected=["(root) PASSWD: ALL"]), "Sudo list failed!"
     assert not client.auth.sudo.run("user-1", command="/bin/ls /root"), "Sudo command successful!"
     assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,client_ip",
+    [
+        ("ipv4_with_mask", "192.168.10.0/26", "192.168.10.5"),
+        ("ipv6", "fd6d:8d64:af0c::8", "fd6d:8d64:af0c::8"),
+        ("ipv6_with_mask", "fd6d:8d64:af0c::/72", "fd6d:8d64:af0c::8"),
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_allowed(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, client_ip: str
+):
+    """
+    :title: Sudo rule allows access with matching IPv4/IPv6 addresses and CIDR masks
+    :description: Verifies sudo rules work when client IP matches sudoHost configuration
+    :setup:
+        1. Configure client IP to match sudoHost rule
+        2. Create user and sudorule with IP-based sudoHost
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User can list sudo rules
+        2. User can execute sudo commands when IP matches
+    :customerscenario: True
+    """
+    # Configure client IP
+    if "ipv6" in ip_type:
+        client.host.ssh.run(f"ip -6 addr add {client_ip}/128 dev lo", raise_on_error=False)
+    else:
+        client.host.ssh.run(f"ip addr add {client_ip}/32 dev lo", raise_on_error=False)
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert client.auth.sudo.list("user-1", "Secret123"), f"Sudo list failed for sudoHost={host_value}!"
+        assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+    finally:
+        if "ipv6" in ip_type:
+            client.host.ssh.run(f"ip -6 addr del {client_ip}/128 dev lo", raise_on_error=False)
+        else:
+            client.host.ssh.run(f"ip addr del {client_ip}/32 dev lo", raise_on_error=False)
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,client_ip",
+    [
+        ("ipv4_with_mask", "192.168.10.0/26", "192.168.20.5"),
+        ("ipv6", "fd6d:8d64:af0c::8", "fd6d:8d64:af0c::9"),
+        ("ipv6_with_mask", "fd6d:8d64:af0c::/72", "fd6d:8d64:af0d::8"),
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_denied(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, client_ip: str
+):
+    """
+    :title: Sudo rule denies access with non-matching IPv4/IPv6 addresses
+    :description: Verifies sudo rules properly deny when client IP doesn't match sudoHost
+    :setup:
+        1. Configure client IP to NOT match sudoHost rule
+        2. Create user and sudorule with IP-based sudoHost
+        3. Enable SSSD sudo responder and start SSSD
+    :steps:
+        1. List sudo rules for "user-1"
+        2. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User cannot list sudo rules
+        2. User cannot execute sudo commands when IP doesn't match
+    :customerscenario: True
+    """
+    # Configure client IP
+    if "ipv6" in ip_type:
+        client.host.ssh.run(f"ip -6 addr add {client_ip}/128 dev lo", raise_on_error=False)
+    else:
+        client.host.ssh.run(f"ip addr add {client_ip}/32 dev lo", raise_on_error=False)
+
+    try:
+        provider.user("user-1").add()
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        client.sssd.common.sudo()
+        client.sssd.start()
+
+        assert not client.auth.sudo.list("user-1", "Secret123"), "Sudo list succeeded when it should fail!"
+        assert not client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command succeeded!"
+
+    finally:
+        if "ipv6" in ip_type:
+            client.host.ssh.run(f"ip -6 addr del {client_ip}/128 dev lo", raise_on_error=False)
+        else:
+            client.host.ssh.run(f"ip addr del {client_ip}/32 dev lo", raise_on_error=False)
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,needs_ip_config",
+    [
+        ("ipv4_with_mask", "172.16.100.0/24", False),  # Client already has 172.16.100.40
+        ("ipv6", "fd6d:8d64:af0c::28", True),  # Add specific IPv6
+        ("ipv6_with_mask", "fd6d:8d64:af0c::/64", True),  # IPv6 CIDR
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_native_ldap_allowed(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, needs_ip_config: bool
+):
+    """
+    :title: Sudo native LDAP allows access with matching IPv4/IPv6 addresses and CIDR masks
+    :description:
+        Verifies sudo rules work with native LDAP (no SSSD) when client IP matches sudoHost.
+        Sudo only matches IPs from actual network interfaces (not loopback), so this test
+        uses the client's eth0 interface (172.16.100.40 for IPv4, adds IPv6 for testing).
+    :setup:
+        1. Configure client IPv6 on eth0 if needed (IPv4 already present)
+        2. Create local user and LDAP sudorule with IP-based sudoHost
+        3. Configure sudo to query LDAP directly via /etc/sudo-ldap.conf (no SSSD)
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User can execute sudo commands when IP matches using native LDAP
+    :customerscenario: True
+    :requirement: None
+    """
+    # Configure client IPv6 address on eth0 if needed
+    # Note: IPv4 test uses existing 172.16.100.40 on eth0
+    if needs_ip_config and "ipv6" in ip_type:
+        client.host.conn.run("ip -6 addr add fd6d:8d64:af0c::28/64 dev eth0", raise_on_error=False)
+
+    try:
+        # Create local user (sudo needs local user for authentication)
+        client.host.conn.run("useradd -m user-1", raise_on_error=False)
+        # Use chpasswd for cross-distro compatibility (RHEL and Debian)
+        client.host.conn.run("echo 'user-1:Secret123' | chpasswd", raise_on_error=False)
+
+        # Create sudo rule in LDAP
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        # Configure sudo to use native LDAP (not SSSD)
+        sudo_ldap_conf = f"""# Sudo native LDAP configuration
+uri ldap://{provider.host.hostname}
+sudoers_base ou=sudoers,{provider.naming_context}
+binddn {provider.host.binddn}
+bindpw {provider.host.bindpw}
+"""
+        client.fs.write("/etc/sudo-ldap.conf", sudo_ldap_conf)
+
+        # Ensure nsswitch uses files for passwd (not SSSD) and ldap for sudoers
+        client.host.conn.run("sed -i 's/^passwd:.*/passwd: files/' /etc/nsswitch.conf", raise_on_error=False)
+        client.host.conn.run(
+            "grep -q '^sudoers:' /etc/nsswitch.conf && "
+            "sed -i 's/^sudoers:.*/sudoers: ldap/' /etc/nsswitch.conf || "
+            "echo 'sudoers: ldap' >> /etc/nsswitch.conf",
+            raise_on_error=False,
+        )
+
+        # Test sudo access - should succeed when IP matches
+        assert client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command failed!"
+
+    finally:
+        # Cleanup
+        if needs_ip_config and "ipv6" in ip_type:
+            client.host.conn.run("ip -6 addr del fd6d:8d64:af0c::28/64 dev eth0", raise_on_error=False)
+        client.host.conn.run("userdel -r user-1", raise_on_error=False)
+        client.fs.rm("/etc/sudo-ldap.conf")
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareLDAP)
+@pytest.mark.parametrize(
+    "ip_type,host_value,needs_ip_config",
+    [
+        ("ipv4_with_mask", "192.168.10.0/24", False),  # Client has 172.16.100.40, doesn't match
+        ("ipv6", "fd6d:8d64:af0c::99", True),  # Different IP, won't match ::28
+        ("ipv6_with_mask", "fd6d:8d64:af0d::/64", True),  # Different subnet
+    ],
+)
+def test_sudo__host_ipv4_ipv6_with_mask_native_ldap_denied(
+    client: Client, provider: LDAP, ip_type: str, host_value: str, needs_ip_config: bool
+):
+    """
+    :title: Sudo native LDAP denies access with non-matching IPv4/IPv6 addresses
+    :description:
+        Verifies sudo rules properly deny with native LDAP when client IP doesn't match sudoHost.
+        Client has 172.16.100.40 on eth0, so non-matching ranges should deny access.
+    :setup:
+        1. Configure client IPv6 on eth0 if needed (IPv4 already present)
+        2. Create local user and LDAP sudorule with non-matching IP-based sudoHost
+        3. Configure sudo to query LDAP directly via /etc/sudo-ldap.conf (no SSSD)
+    :steps:
+        1. Run "sudo /bin/ls /root" as user-1
+    :expectedresults:
+        1. User cannot execute sudo commands when IP doesn't match using native LDAP
+    :customerscenario: True
+    :requirement: None
+    """
+    # Configure client IPv6 address on eth0 if needed for testing
+    if needs_ip_config and "ipv6" in ip_type:
+        client.host.conn.run("ip -6 addr add fd6d:8d64:af0c::28/64 dev eth0", raise_on_error=False)
+
+    try:
+        # Create local user (sudo needs local user for authentication)
+        client.host.conn.run("useradd -m user-1", raise_on_error=False)
+        # Use chpasswd for cross-distro compatibility (RHEL and Debian)
+        client.host.conn.run("echo 'user-1:Secret123' | chpasswd", raise_on_error=False)
+
+        # Create sudo rule in LDAP
+        provider.sudorule("allow-from-ip").add(user="user-1", host=host_value, command="ALL")
+
+        # Configure sudo to use native LDAP (not SSSD)
+        sudo_ldap_conf = f"""# Sudo native LDAP configuration
+uri ldap://{provider.host.hostname}
+sudoers_base ou=sudoers,{provider.naming_context}
+binddn {provider.host.binddn}
+bindpw {provider.host.bindpw}
+"""
+        client.fs.write("/etc/sudo-ldap.conf", sudo_ldap_conf)
+
+        # Ensure nsswitch uses files for passwd (not SSSD) and ldap for sudoers
+        client.host.conn.run("sed -i 's/^passwd:.*/passwd: files/' /etc/nsswitch.conf", raise_on_error=False)
+        client.host.conn.run(
+            "grep -q '^sudoers:' /etc/nsswitch.conf && "
+            "sed -i 's/^sudoers:.*/sudoers: ldap/' /etc/nsswitch.conf || "
+            "echo 'sudoers: ldap' >> /etc/nsswitch.conf",
+            raise_on_error=False,
+        )
+
+        # Test sudo access - should fail when IP doesn't match
+        assert not client.auth.sudo.run("user-1", "Secret123", command="/bin/ls /root"), "Sudo command succeeded!"
+
+    finally:
+        # Cleanup
+        if needs_ip_config and "ipv6" in ip_type:
+            client.host.conn.run("ip -6 addr del fd6d:8d64:af0c::28/64 dev eth0", raise_on_error=False)
+        client.host.conn.run("userdel -r user-1", raise_on_error=False)
+        client.fs.rm("/etc/sudo-ldap.conf")
