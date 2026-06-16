@@ -158,3 +158,30 @@ def test__regex_regex_in_command_parameter(client: Client):
     assert not client.auth.sudo.run(u.name, "Secret123", command="/bin/ls /root"), (
         f"Running ls /root as {u.name} using sudo passed!"
     )
+
+
+@pytest.mark.topology(KnownTopology.BareClient)
+@pytest.mark.ticket(jira=["RHEL-184287"])
+def test__internationalization_error_message(client: Client):
+    """
+    :title: Sudo error messages are translated when LANG is set
+    :setup:
+        1. Check if spanish locale is avaliable and skip if not.
+    :steps:
+        1. Run "sudo -z" with LANG=es_ES.UTF-8
+    :expectedresults:
+        1. Command fails with a Spanish error message
+    :customerscenario: True
+    """
+    locale = client.host.conn.run("locale -a", raise_on_error=False)
+    if locale.rc != 0 or "es_es.utf8" not in locale.stdout.lower():
+        pytest.skip("es_ES.UTF-8 locale is not available")
+
+    mo = client.host.conn.run("find /usr/share/locale -path '*/LC_MESSAGES/sudo.mo'", raise_on_error=False)
+    if mo.rc != 0 or "es" not in mo.stdout:
+        pytest.skip("Spanish sudo translation catalog is not installed")
+
+    result = client.host.conn.run("sudo -z", env={"LANG": "es_ES.UTF-8"}, raise_on_error=False)
+    assert result.rc != 0, "sudo -z should fail with invalid option"
+    output = f"{result.stdout}{result.stderr}"
+    assert "opción inválida" in output, f"Expected Spanish i18n message, got: {output!r}"
