@@ -1,6 +1,11 @@
 summary: This sanity test checks pre-defined (some are commented) options (examples)
     in sudoers file.
-description: ''
+description: |
+    Verify that the default sudoers file contains expected active options
+    (env_reset, secure_path, env_keep), commented examples (Host_Alias,
+    Cmnd_Alias, User_Alias), correct user/group settings, and that features like
+    requiretty, pam_service, iolog, env_check, and runas_check_shell behave as
+    configured.
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require:

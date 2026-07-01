@@ -1,5 +1,7 @@
 summary: 'It tests desired behaviour: sudo su - user'
-description: ''
+description: |
+    Verify that 'sudo su - user' correctly switches to the target user when
+    sudoers rules allow 'su - [A-z]*' but deny 'su -' and 'su - root'.
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:

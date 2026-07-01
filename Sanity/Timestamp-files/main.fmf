@@ -1,5 +1,8 @@
 summary: Check existence of new directories for timestamp files
-description: ''
+description: |
+    Verify that the expected directory for sudo timestamp files exists in one of
+    the standard locations (/var/db/sudo, /var/lib/sudo, /var/adm/sudo, or
+    /var/run/sudo/ts).
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:

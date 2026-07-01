@@ -1,4 +1,8 @@
 summary: This sanity test for sudoedit
+description: |
+    Verify that sudoedit works correctly in various configurations including
+    plain sudoedit, with SELinux role, SELinux type, and combined role and type
+    options, both with and without actual file modifications.
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require+:

@@ -1,4 +1,8 @@
 summary: 'Defaults use_pty plus SELinux ROLE in user specification breaks terminal'
+description: |
+    Verify that enabling 'Defaults use_pty' together with an SELinux ROLE in the
+    user specification does not break terminal handling, checking for errors such
+    as 'cannot set terminal process group' or 'Inappropriate ioctl for device'.
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 require+:

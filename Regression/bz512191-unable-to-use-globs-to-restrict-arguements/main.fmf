@@ -1,5 +1,8 @@
 summary: It tests wildcard restrictions.
-description: ''
+description: |
+    Verify that wildcard (glob) patterns in sudoers correctly restrict command
+    arguments, allowing access to files matching [A-z]* while denying access to
+    files starting with non-alphabetic characters.
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:

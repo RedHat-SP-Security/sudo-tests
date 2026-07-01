@@ -1,5 +1,8 @@
 summary: Load the sudo python plugin examples provided in /usr/share/doc/sudo/examples
-description: ''
+description: |
+    Verify that sudo python plugin examples (approval, audit, conversation, I/O,
+    policy, and group plugins) from /usr/share/doc/sudo/examples load and
+    function correctly, including testing relative module paths.
 contact: Martin Zelený <mzeleny@redhat.com>
 component:
   - sudo

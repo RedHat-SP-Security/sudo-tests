@@ -1,5 +1,8 @@
 summary: It tests sudo correctness of users' groups.
-description: ''
+description: |
+    Verify that sudo correctly resolves group membership when runas_default is
+    set, ensuring that running 'sudo id' does not report bogus group memberships
+    such as groups=0(root).
 contact: Dalibor Pospíšil <dapospis@redhat.com>
 test: ./runtest.sh
 recommend:

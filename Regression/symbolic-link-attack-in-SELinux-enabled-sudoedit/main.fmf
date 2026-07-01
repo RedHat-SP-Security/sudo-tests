@@ -1,5 +1,8 @@
 summary: Race condition vulnerability in file handling of sudoedit SELinux RBAC support
-description: ''
+description: |
+    Verify that sudoedit with SELinux RBAC support is not vulnerable to a
+    symbolic link race condition attack, ensuring it does not segfault and does
+    not allow file ownership changes through a malicious EDITOR variable.
 contact: Martin Zelený <mzeleny@redhat.com>
 component:
 - sudo

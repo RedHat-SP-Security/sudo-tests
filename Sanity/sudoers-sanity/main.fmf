@@ -11,5 +11,9 @@ tier: '1'
 duration: 5m
 test: ./runtest.sh
 summary: A sudoers sanity test
+description: |
+    Verify that basic sudoers configuration works correctly, including that a
+    member of the wheel group can execute commands as root and that a user with
+    an explicit sudoers rule can run commands as root.
 extra-task: /CoreOS/sudo/Sanity/sudoers-sanity
 extra-nitrate: TC#0612869
