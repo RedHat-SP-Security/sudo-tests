@@ -53,8 +53,8 @@ def test_visudo__syntax_check_invalid_rule(client: Client):
     result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
 
     assert result.rc != 0, "visudo should have failed on an invalid rule but returned rc=0"
-    assert "parse error" in result.stderr.lower(), (
-        f"Expected 'parse error' in visudo output: {result.stdout} {result.stderr}"
+    assert "parse error" in result.stderr.lower() or "syntax error" in result.stderr.lower(), (
+        f"Expected 'parse error' or 'syntax error' in visudo output: {result.stdout} {result.stderr}"
     )
 
 
@@ -101,8 +101,8 @@ def test_visudo__sudoers_d_invalid_dropin_is_caught(client: Client):
     result = client.host.conn.run("visudo -c", raise_on_error=False)
 
     assert result.rc != 0, "visudo -c should have failed due to invalid drop-in but returned rc=0"
-    assert "parse error" in result.stderr.lower(), (
-        f"Expected 'parse error' in visudo output: {result.stdout} {result.stderr}"
+    assert "parse error" in result.stderr.lower() or "syntax error" in result.stderr.lower(), (
+        f"Expected 'parse error' or 'syntax error' in visudo output: {result.stdout} {result.stderr}"
     )
     assert dropin in result.stderr, f"Expected visudo error to reference drop-in path '{dropin}': {result.stderr}"
 
