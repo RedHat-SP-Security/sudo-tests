@@ -7,10 +7,15 @@ SUDO Security CVE Tests.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 from sssd_test_framework.roles.client import Client
 from sssd_test_framework.topology import KnownTopology
+
+_CVE_82474_EXECVEAT_SRC = Path(__file__).resolve().parent.parent / "data" / "cve_82474_execveat.c"
+_CVE_82474_HELPER_BIN = "/tmp/cve_82474_execveat"
+_CVE_82474_SUDOERS = "/etc/sudoers.d/00-cve-82474-intercept"
 
 # Records effective uid/gid of the mailer process (see CVE-2026-35535 repro).
 _FAKE_MAILER = """#!/bin/bash
@@ -120,4 +125,72 @@ def test_cve__mailer_escalation(client: Client):
     assert f"Effective UID: {expected_uid}" in mail, (
         f"Mail file should record {username!r}'s effective UID ({expected_uid}) after sudo invoked the "
         f"mailer; missing or wrong line. Full mail file: {mail!r}"
+    )
+
+
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_cve__execveat_intercept_policy_bypass(client: Client):
+    """
+    :title: CVE-2026-82474: ptrace intercept must policy-check execveat(2)
+    :setup:
+        1. Require sudo with intercept support and seccomp trap (intercept_type=trace)
+        2. Create local user "testuser"
+        3. Install a helper that runs /usr/bin/id via execveat(2)
+        4. Add sudoers drop-in with Defaults intercept, intercept_type=trace, and a rule
+           allowing only the helper in INTERCEPT mode
+        5. Enable local SSSD + sudo
+    :steps:
+        1. Run the helper via sudo as testuser
+    :expectedresults:
+        1. execveat of the denied /usr/bin/id is rejected (helper exits non-zero)
+    :customerscenario: False
+    """
+    if client.host.compare_package_version({"major": 1, "minor": 9, "patch": 8}, "sudo") < 0:
+        pytest.skip("sudo intercept support requires sudo >= 1.9.8")
+
+    seccomp_trap = client.host.conn.run("grep -qw trap /proc/sys/kernel/seccomp/actions_avail 2>/dev/null")
+    if seccomp_trap.rc != 0:
+        pytest.skip("seccomp trap action unavailable; intercept_type=trace is not supported on this host")
+
+    username = "testuser"
+    helper_src = _CVE_82474_EXECVEAT_SRC.read_text(encoding="utf-8")
+    helper_src_path = f"{_CVE_82474_HELPER_BIN}.c"
+
+    client.user(username).add(uid=10001, password="Secret123")
+    client.host.conn.run("dnf install -y gcc", raise_on_error=False)
+
+    client.fs.write(helper_src_path, helper_src)
+    compile_helper = client.host.conn.run(f"gcc -o {_CVE_82474_HELPER_BIN} {helper_src_path}")
+    assert compile_helper.rc == 0, (
+        f"Failed to compile execveat helper for CVE-2026-82474: rc={compile_helper.rc} "
+        f"stderr={compile_helper.stderr!r} stdout={compile_helper.stdout!r}"
+    )
+    client.fs.chmod(path=_CVE_82474_HELPER_BIN, mode="ugo+rx")
+
+    sudoers = (
+        "Defaults intercept\n"
+        "Defaults intercept_type=trace\n"
+        f"{username} ALL=(ALL) NOPASSWD: INTERCEPT: {_CVE_82474_HELPER_BIN}\n"
+    )
+    client.fs.write(_CVE_82474_SUDOERS, sudoers)
+    client.fs.chmod(path=_CVE_82474_SUDOERS, mode="ugo+r")
+    visudo = client.host.conn.run(f"visudo -cf {_CVE_82474_SUDOERS}")
+    assert visudo.rc == 0, (
+        f"visudo rejected {_CVE_82474_SUDOERS}: sudoers syntax is invalid so sudo would not load the "
+        f"CVE intercept test fragment. stderr={visudo.stderr!r} stdout={visudo.stdout!r}"
+    )
+
+    client.sssd.common.local()
+    client.sssd.common.sudo()
+    client.sssd.start()
+
+    result = client.auth.sudo.run_advanced(username, "Secret123", command=_CVE_82474_HELPER_BIN)
+    assert result.rc != 0, (
+        "CVE-2026-82474: intercept mode must deny execveat of /usr/bin/id from the allowed helper; "
+        f"got rc={result.rc} stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "uid=0" not in result.stdout, (
+        "CVE-2026-82474: helper must not run /usr/bin/id as root via execveat bypass; "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
     )
