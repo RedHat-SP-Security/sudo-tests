@@ -7,6 +7,7 @@ SUDO Security CVE Tests.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timedelta
 
 import pytest
 from sssd_test_framework.roles.client import Client
@@ -120,4 +121,101 @@ def test_cve__mailer_escalation(client: Client):
     assert f"Effective UID: {expected_uid}" in mail, (
         f"Mail file should record {username!r}'s effective UID ({expected_uid}) after sudo invoked the "
         f"mailer; missing or wrong line. Full mail file: {mail!r}"
+    )
+
+
+def _local_gentime(when: datetime) -> str:
+    """Generalized Time without Z/offset so parse_gentime() uses mktime()."""
+    return when.strftime("%Y%m%d%H%M%S")
+
+
+def _sudo_as(client: Client, username: str, command: str, *, tz: str | None = None) -> int:
+    """Run sudo -n as user; optional TZ in the same environment as sudo."""
+    env = f"TZ={tz} " if tz else ""
+    result = client.host.conn.run(
+        f'su - "{username}" -c "{env}sudo -n {command}"',
+        raise_on_error=False,
+    )
+    return result.rc
+
+
+@pytest.mark.ticket(
+    jira=[
+        "RHEL-267328",
+        "RHEL-267329",
+        "RHEL-267330",
+        "RHEL-267333",
+        "RHEL-267334",
+        "RHEL-267337",
+        "RHEL-267338",
+        "RHEL-267339",
+        "RHEL-267340",
+        "RHEL-267341",
+        "RHEL-267342",
+        "RHEL-267343",
+        "RHEL-267344",
+        "RHEL-267345",
+        "RHEL-267347",
+        "RHEL-267349",
+    ]
+)
+@pytest.mark.importance("critical")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_cve__tz_bypasses_notbefore_notafter(client: Client):
+    """
+    :title: CVE-2026-96512: TZ must not bypass NOTBEFORE/NOTAFTER
+    :setup:
+        1. Create local user "testuser"
+        2. Enable local SSSD + sudo
+        3. Install sudoers drop-in with expired NOTAFTER (no Z) for /usr/bin/whoami
+    :steps:
+        1. Run sudo -n /usr/bin/whoami without TZ
+        2. Run sudo -n /usr/bin/whoami with TZ=XXX24
+        3. Replace rule with future NOTBEFORE (no Z); run without TZ
+        4. Run with TZ=XXX-24
+    :expectedresults:
+        1. Denied (rule expired under system time)
+        2. Still denied (extreme TZ must not revive expired NOTAFTER)
+        3. Denied (rule not yet active)
+        4. Still denied (extreme TZ must not unlock future NOTBEFORE)
+    :customerscenario: False
+    """
+    username = "testuser"
+    drop_in = "/etc/sudoers.d/00-cve-96512-tz"
+    command = "/usr/bin/whoami"
+    client.user(username).add(uid=10001, password="Secret123")
+
+    client.sssd.common.local()
+    client.sssd.common.sudo()
+    client.sssd.start()
+
+    # NOTAFTER ~2h ago, local time (no Z): mktime path that TZ can skew when unfixed
+    notafter = _local_gentime(datetime.now() - timedelta(hours=2))
+    sudoers = f"{username} ALL=(ALL) NOTAFTER={notafter} NOPASSWD: {command}\n"
+    client.fs.write(drop_in, sudoers)
+    client.fs.chmod(path=drop_in, mode="ugo+r")
+    visudo = client.host.conn.run(f"visudo -cf {drop_in}")
+    assert visudo.rc == 0, f"visudo rejected {drop_in}: stderr={visudo.stderr!r} stdout={visudo.stdout!r}"
+
+    assert _sudo_as(client, username, command) != 0, (
+        f"Sanity: NOTAFTER={notafter} is ~2h in the past; sudo -n {command} as {username!r} "
+        f"must be denied without TZ. If this passes, timestamps or sudoers loading are wrong."
+    )
+    assert _sudo_as(client, username, command, tz="XXX24") != 0, (
+        f"CVE-2026-96512: TZ=XXX24 must not make expired NOTAFTER={notafter} allow "
+        f"{command} for {username!r}. Unfixed sudo treats the stamp via mktime() under TZ."
+    )
+
+    notbefore = _local_gentime(datetime.now() + timedelta(hours=2))
+    sudoers = f"{username} ALL=(ALL) NOTBEFORE={notbefore} NOPASSWD: {command}\n"
+    client.fs.write(drop_in, sudoers)
+    visudo = client.host.conn.run(f"visudo -cf {drop_in}")
+    assert visudo.rc == 0, f"visudo rejected {drop_in}: stderr={visudo.stderr!r} stdout={visudo.stdout!r}"
+
+    assert _sudo_as(client, username, command) != 0, (
+        f"Sanity: NOTBEFORE={notbefore} is ~2h ahead; sudo -n {command} as {username!r} must be denied without TZ."
+    )
+    assert _sudo_as(client, username, command, tz="XXX-24") != 0, (
+        f"CVE-2026-96512: TZ=XXX-24 must not make future NOTBEFORE={notbefore} allow "
+        f"{command} for {username!r}. Unfixed sudo treats the stamp via mktime() under TZ."
     )
