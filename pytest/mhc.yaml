@@ -1,6 +1,7 @@
 provisioned_topologies:
 - bareipa
 - bareldap
+- bare_client
 domains:
 - id: sssd
   hosts:
