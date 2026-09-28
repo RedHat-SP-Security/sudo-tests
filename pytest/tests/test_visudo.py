@@ -267,3 +267,104 @@ def test_visudo__sudo_list_shows_allowed_commands(client: Client):
     assert result.rc == 0, f"sudo -l failed for {user.name}: {result.stderr}"
     assert "/bin/ls" in result.stdout, f"Expected /bin/ls in sudo -l output: {result.stdout!r}"
     assert "/bin/id" in result.stdout, f"Expected /bin/id in sudo -l output: {result.stdout!r}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__runas_alias_valid_syntax(client: Client):
+    """
+    :title: visudo accepts a valid Runas_Alias definition and its use in a rule
+    :setup:
+        1. Write a sudoers file defining a Runas_Alias and a rule that references it
+    :steps:
+        1. Run visudo -c -f <file> against the file
+    :expectedresults:
+        1. visudo exits with rc=0, Runas_Alias definition and rule reference are both valid
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_runas_alias_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(
+        sudoers_file,
+        "Runas_Alias DB_USERS = postgres, mysql\ntestuser ALL=(DB_USERS) NOPASSWD: /bin/ls\n",
+    )
+
+    result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc == 0, f"visudo rejected a valid Runas_Alias rule: {result.stdout} {result.stderr}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__group_based_rule_allows_member_to_run_command(client: Client):
+    """
+    :title: A group-based sudoers rule allows a group member to run the allowed command
+    :setup:
+        1. Create a local group and a local user that is a member of the group
+        2. Write a NOPASSWD sudoers rule granting /bin/whoami to %<group>
+    :steps:
+        1. Run sudo -n /bin/whoami as the group member
+    :expectedresults:
+        1. Command succeeds and outputs "root"
+    :customerscenario: False
+    """
+    uid = uuid.uuid4().hex[:8]
+    group = client.group(f"sudo-grp-{uid}").add()
+    user = client.user(f"sudo-usr-{uid}").add(shell="/bin/bash")
+    group.add_member(user)
+    client.fs.write(
+        f"/etc/sudoers.d/{group.name}",
+        f"%{group.name} ALL=(root) NOPASSWD: /bin/whoami\n",
+    )
+
+    result = client.host.conn.run(f"su -s /bin/bash -c 'sudo -n /bin/whoami' {user.name}", raise_on_error=False)
+
+    assert result.rc == 0, f"sudo whoami failed for group member {user.name}: {result.stderr}"
+    assert "root" in result.stdout, f"Expected 'root' in whoami output, got: {result.stdout!r}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__defaults_directive_valid_syntax(client: Client):
+    """
+    :title: visudo accepts a sudoers file with a valid Defaults directive
+    :setup:
+        1. Write a sudoers file containing a Defaults directive and a rule
+    :steps:
+        1. Run visudo -c -f <file> against the file
+    :expectedresults:
+        1. visudo exits with rc=0, Defaults directive is syntactically valid
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_defaults_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(
+        sudoers_file,
+        'Defaults !requiretty\nDefaults env_keep += "HOME"\ntestuser ALL=(root) NOPASSWD: /bin/ls\n',
+    )
+
+    result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc == 0, f"visudo rejected a valid Defaults directive: {result.stdout} {result.stderr}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__duplicate_alias_name_is_rejected(client: Client):
+    """
+    :title: visudo rejects a sudoers file that defines the same alias name twice
+    :setup:
+        1. Write a sudoers file that defines the same Cmnd_Alias name twice
+    :steps:
+        1. Run visudo -c -f <file> against the file
+    :expectedresults:
+        1. visudo exits with a non-zero rc and reports an error about the duplicate alias
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_dup_alias_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(
+        sudoers_file,
+        "Cmnd_Alias MYCMDS = /bin/ls\nCmnd_Alias MYCMDS = /bin/id\ntestuser ALL=(root) NOPASSWD: MYCMDS\n",
+    )
+
+    result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc != 0, "visudo should have rejected a duplicate alias definition but returned rc=0"
