@@ -368,3 +368,146 @@ def test_visudo__duplicate_alias_name_is_rejected(client: Client):
     result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
 
     assert result.rc != 0, "visudo should have rejected a duplicate alias definition but returned rc=0"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__quiet_flag_suppresses_output_on_valid_file(client: Client):
+    """
+    :title: visudo -q produces no output and exits with rc=0 for a valid sudoers file
+    :setup:
+        1. Write a syntactically correct sudoers rule to a temporary file
+    :steps:
+        1. Run visudo -c -q -f <file>
+    :expectedresults:
+        1. visudo exits with rc=0 and produces no stdout or stderr output
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_quiet_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(sudoers_file, "testuser ALL=(root) NOPASSWD: /bin/ls\n")
+
+    result = client.host.conn.run(f"visudo -c -q -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc == 0, f"visudo -q failed on a valid file: {result.stdout} {result.stderr}"
+    assert result.stdout.strip() == "", f"visudo -q should produce no stdout, got: {result.stdout!r}"
+    assert result.stderr.strip() == "", f"visudo -q should produce no stderr, got: {result.stderr!r}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__strict_mode_rejects_undefined_alias(client: Client):
+    """
+    :title: visudo -s rejects a sudoers file that references an undefined Cmnd_Alias
+    :setup:
+        1. Write a sudoers file that references UNDEFINED_ALIAS without defining it
+    :steps:
+        1. Run visudo -c -f <file> without strict mode to confirm the file is otherwise accepted
+        2. Run visudo -c -s -f <file> with strict mode
+    :expectedresults:
+        1. visudo exits with rc=0, confirming the undefined alias is only a warning without strict mode
+        2. visudo exits with a non-zero rc and stderr references the undefined alias
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_strict_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(sudoers_file, "testuser ALL=(root) NOPASSWD: UNDEFINED_ALIAS\n")
+
+    without_strict = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+    assert without_strict.rc == 0, (
+        f"visudo without -s should accept the file (undefined alias is a warning, not an error): "
+        f"{without_strict.stderr}"
+    )
+
+    with_strict = client.host.conn.run(f"visudo -c -s -f {sudoers_file}", raise_on_error=False)
+    assert with_strict.rc != 0, "visudo -s should have rejected the undefined alias but returned rc=0"
+    assert "UNDEFINED_ALIAS" in with_strict.stderr, (
+        f"Expected alias name in strict-mode error output, got: {with_strict.stderr!r}"
+    )
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__syntax_error_reports_line_number(client: Client):
+    """
+    :title: visudo reports the line number of a syntax error
+    :setup:
+        1. Write a three-line sudoers file where line 3 contains a syntax error
+    :steps:
+        1. Run visudo -c -f <file>
+    :expectedresults:
+        1. visudo exits with a non-zero rc and the error output references line 3
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_lineno_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(
+        sudoers_file,
+        "user1 ALL=(root) NOPASSWD: /bin/ls\nuser2 ALL=(root) NOPASSWD: /bin/id\nuser3 (ALL) NOPASSWD: /bin/cat\n",
+    )
+
+    result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc != 0, "visudo should have failed on the syntax error on line 3"
+    assert ":3:" in result.stderr, f"Expected ':3:' (file:line:col) in visudo error output, got: {result.stderr!r}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__all_four_alias_types_valid_syntax(client: Client):
+    """
+    :title: visudo accepts a sudoers file that defines and uses all four alias types
+    :setup:
+        1. Write a sudoers file defining User_Alias, Host_Alias, Cmnd_Alias, and Runas_Alias,
+           each referenced in a rule
+    :steps:
+        1. Run visudo -c -f <file>
+    :expectedresults:
+        1. visudo exits with rc=0, all alias types are syntactically valid when defined and used
+    :customerscenario: False
+    """
+    sudoers_file = f"/tmp/test_visudo_all_aliases_{uuid.uuid4().hex[:8]}.sudoers"
+    client.fs.write(
+        sudoers_file,
+        "User_Alias  OPERATORS = alice, bob\n"
+        "Host_Alias  WEBSERVERS = web1, web2\n"
+        "Cmnd_Alias  NET_CMDS = /sbin/ip, /sbin/ifconfig\n"
+        "Runas_Alias NET_USERS = root, nobody\n"
+        "OPERATORS WEBSERVERS=(NET_USERS) NOPASSWD: NET_CMDS\n",
+    )
+
+    result = client.host.conn.run(f"visudo -c -f {sudoers_file}", raise_on_error=False)
+
+    assert result.rc == 0, f"visudo rejected a file with all four alias types: {result.stdout} {result.stderr}"
+
+
+@pytest.mark.importance("high")
+@pytest.mark.topology(KnownTopology.BareClient)
+def test_visudo__includedir_directive_is_processed(client: Client):
+    """
+    :title: visudo processes @includedir and catches errors in included files
+    :setup:
+        1. Create a temporary include directory
+        2. Write a main sudoers file that references it via @includedir
+    :steps:
+        1. Place a syntactically invalid file in the include directory and run visudo -c -f <main>
+        2. Remove the invalid file and run visudo -c -f <main> again
+    :expectedresults:
+        1. visudo exits with a non-zero rc, confirming the include directory is actually processed
+        2. visudo exits with rc=0 once the invalid file is removed
+    :customerscenario: False
+    """
+    uid = uuid.uuid4().hex[:8]
+
+    bad_includedir = f"/tmp/test_visudo_incdir_bad_{uid}"
+    bad_dropin = f"{bad_includedir}/bad-rule"
+    bad_sudoers = f"/tmp/test_visudo_bad_{uid}.sudoers"
+    client.host.conn.run(f"mkdir -p {bad_includedir}")
+    client.fs.write(bad_dropin, "testuser (ALL) NOPASSWD: /bin/ls\n")
+    client.fs.write(bad_sudoers, f"testuser ALL=(root) NOPASSWD: /bin/ls\n@includedir {bad_includedir}\n")
+    bad = client.host.conn.run(f"visudo -c -f {bad_sudoers}", raise_on_error=False)
+    assert bad.rc != 0, "@includedir was silently ignored: visudo should have failed on the invalid drop-in"
+
+    clean_includedir = f"/tmp/test_visudo_incdir_clean_{uid}"
+    clean_sudoers = f"/tmp/test_visudo_clean_{uid}.sudoers"
+    client.host.conn.run(f"mkdir -p {clean_includedir}")
+    client.fs.write(clean_sudoers, f"testuser ALL=(root) NOPASSWD: /bin/ls\n@includedir {clean_includedir}\n")
+    good = client.host.conn.run(f"visudo -c -f {clean_sudoers}", raise_on_error=False)
+    assert good.rc == 0, f"visudo should pass with a clean includedir: {good.stdout} {good.stderr}"
